@@ -46,7 +46,7 @@ def fc(input, name, input_channel, output_channel):
     b = tf.get_variable(name=name + '_bias', shape=[output_channel])
     return tf.matmul(input, W) + b
 
-batch_size = 64
+batch_size = 100
 x = tf.placeholder("float", shape=[batch_size, 32, 32, 3])
 y = tf.placeholder("float", shape=[batch_size, 10])
 
@@ -78,6 +78,9 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 train_iterator, train_next_batch = dataset('train', batch_size)
 test_iterator, test_next_batch = dataset('test', batch_size)
 
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)

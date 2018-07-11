@@ -23,30 +23,51 @@ def read_video(PATH):
                     break
     print(max_frame)
 
-def dataset(PATH, batch_size, one_hot = True):
+def dataset(PATH, batch_size, proportion, one_hot = True):
     CLASS = os.listdir(PATH)
     CLASS_NUM = len(CLASS)
 
-    data = np.array([])
-    label = np.array([])
+    train_data = np.array([])
+    train_label = np.array([])
+
+    test_data = np.array([])
+    test_label = np.array([])
+
     for i in range(CLASS_NUM):
         data_ = os.listdir(PATH + '/' + CLASS[i])
+        train_data_ = []
+        test_data_ = []
         for j in range(len(data_)):
-            data_[j] = PATH + '/' + CLASS[i] + '/' + data_[j]
-        label_ = np.full([len(data_)], i)
+            if np.random.rand() < proportion:
+                test_data_.append(PATH + '/' + CLASS[i] + '/' + data_[j])
+            else:
+                train_data_.append(PATH + '/' + CLASS[i] + '/' + data_[j])
 
-        data = np.concatenate((data, data_), axis=0)
-        label = np.concatenate((label, label_), axis=0)
+        test_label_ = np.full([len(test_data_)], i)
+        train_label_ = np.full([len(train_data_)], i)
+
+        test_data = np.concatenate((test_data, test_data_), axis=0)
+        test_label = np.concatenate((test_label, test_label_), axis=0)
+        train_data = np.concatenate((train_data, train_data_), axis=0)
+        train_label = np.concatenate((train_label, train_label_), axis=0)
     if one_hot:
-        label = tf.one_hot(label, CLASS_NUM, 1, 0)
-    total_num = len(data)
-    print(total_num)
+        train_label = tf.one_hot(train_label, CLASS_NUM, 1, 0)
+        test_label = tf.one_hot(test_label, CLASS_NUM, 1, 0)
 
-    dataset = tf.data.Dataset.from_tensor_slices((data, label))
-    dataset = dataset.shuffle(buffer_size=total_num*2).batch(batch_size).repeat(10)
-    iterator = dataset.make_initializable_iterator()
-    next_batch = iterator.get_next()
-    return iterator, next_batch
+    train_num = len(train_data)
+    test_num = len(test_data)
+    print(train_num, test_num)
+
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_label))
+    train_dataset = train_dataset.shuffle(buffer_size=train_num*2).batch(batch_size).repeat(100)
+    train_iterator = train_dataset.make_initializable_iterator()
+    train_next_batch = train_iterator.get_next()
+
+    test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_label))
+    test_dataset = test_dataset.shuffle(buffer_size=test_num*2).batch(batch_size).repeat(100)
+    test_iterator = test_dataset.make_initializable_iterator()
+    test_next_batch = test_iterator.get_next()
+    return train_iterator, train_next_batch, train_num, test_iterator, test_next_batch, test_num
 
 def load_video(filenames, depth, height, width, channel = 3):
     batch_size = len(filenames)
@@ -80,10 +101,10 @@ def max_pooling_3d(input, depth, width, height):
 def max_pooling_2d(input, width, height):
     return tf.nn.max_pool(input, ksize=[1, width, height, 1], strides=[1, width, height, 1], padding='SAME')
 
-def conv3d(input, name, depth, kernel_size, input_channel, output_channel, depth_strides = 1):
+def conv3d(input, name, depth, kernel_size, input_channel, output_channel, depth_strides = 1, padding = 'SAME'):
     W = tf.get_variable(name = name + '_Weight', shape = [depth, kernel_size, kernel_size, input_channel, output_channel])
     b = tf.get_variable(name = name + '_bias', shape = [output_channel])
-    return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding='SAME'), b)
+    return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding=padding), b)
 
 def conv2d(input, name, kernel_size, input_channel, output_channel):
     W = tf.get_variable(name = name + '_Weight', shape = [kernel_size, kernel_size, input_channel, output_channel])
@@ -186,15 +207,18 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
             return new_h, new_state
 
-def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, pool = False, output_h = False):
+def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train, keep_prob, pool = False, output_h = False):
     shape = input.get_shape() #[time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
-    # cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
+    cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(batch_size, dtype=tf.float32)
 
     output, state = tf.nn.dynamic_rnn(cell, inputs=input, sequence_length=sequence_length, initial_state=init_state, time_major=True)
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
+
+
+
     if output_h:
         if pool:
             output = max_pooling_2d(input=state[1], height=2, width=2)
@@ -202,26 +226,46 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, pool =
         else:
             return state[1]
     else:
+        bn = batch_norm(input=tf.transpose(output, [1, 0, 2, 3, 4]), name=name, train=train)
+        output = tf.transpose(bn, [1, 0, 2, 3, 4])
         if pool:
             output = max_pooling_3d(input=output, depth=1, height=2, width=2)
         return output
 
-depth = 100 # 6 * 6 + 4
-height = 32
-width = 40
+depth = 60 # 6 * 6 + 4
+height = 38
+width = 46
 batch_size = 16
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
 sequence_length = tf.placeholder('int32', shape = [batch_size])
+BN_train = tf.placeholder('bool', shape = [])
+keep_prob = tf.placeholder("float", shape = [])
 
-lstm_input = tf.transpose(x, [1, 0, 2, 3, 4]) # to fit the time_major
+x_ = tf.reshape(x, [-1, 5, height, width, 3])
+print(x.get_shape())
 
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], pool = True)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], pool = True, output_h=True)
+conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 32, padding='VALID')
+batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
+act1 = tf.nn.relu(batch1)
+pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
+print(pool1.get_shape())
 
-reshape = tf.reshape(convlstm3, [batch_size, 4 * 5 * 32])
+conv2 = conv3d(input = pool1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 32, output_channel = 32, padding='VALID')
+batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
+act2 = tf.nn.relu(batch2)
+pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
+
+print(pool2.get_shape())
+
+lstm_input = tf.transpose(tf.reshape(pool2, [batch_size, int(depth/5), 8, 10, 32]), [1, 0, 2, 3, 4]) # to fit the time_major
+print(lstm_input.get_shape())
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
+
+reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 32])
 fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 32, output_channel = 128)
 fc_act1 = tf.nn.relu(fc1)
 
@@ -234,18 +278,40 @@ correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_next_batch = dataset('hmdb51_org', batch_size)
+train_iterator, train_next_batch, train_num, test_iterator, test_next_batch, test_num = dataset('hmdb51_org', batch_size, proportion=0.2)
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
+sess.run(test_iterator.initializer)
 
-for epoch in range(10):
+for epoch in range(100):
     train_correct = 0
-    for i in range(int(6766 / batch_size)):
+    print(epoch, 'train:')
+    for i in range(int(train_num / batch_size)):
         data, label = sess.run(train_next_batch)
-        data, length = load_video(data, depth, height, width)
+        if len(data) == batch_size:
+            data, length = load_video(data, depth, height, width)
+            length = np.array(length/5).astype(int)
 
-        num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length})
-        train_correct += num
-        print((i+1)*batch_size, train_correct/(i+1)/batch_size)
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5})
+            train_correct += num
+        if i%20==19:
+            print((i+1)*batch_size, train_correct/(i+1)/batch_size)
+
+    train_correct = 0
+    print(epoch, 'test:')
+    for i in range(int(test_num / batch_size)):
+        data, label = sess.run(test_next_batch)
+        if len(data) == batch_size:
+            data, length = load_video(data, depth, height, width)
+            length = np.array(length/5).astype(int)
+
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
+            train_correct += num
+        if i%20==19:
+            print((i+1)*batch_size, train_correct/(i+1)/batch_size)
