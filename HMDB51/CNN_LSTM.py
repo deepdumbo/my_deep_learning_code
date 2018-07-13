@@ -2,26 +2,50 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
+import time
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-def read_video(PATH):
+
+def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
+    try:
+        os.mkdir('prestored')
+    except:
+        pass
+
     CLASS = os.listdir(PATH)
     CLASS_NUM = len(CLASS)
 
-    max_frame = 0
     for i in range(CLASS_NUM):
+        print(i)
         video_list = os.listdir(PATH + '/' + CLASS[i])
         for video in video_list:
+            data = np.zeros([depth, height, width, channel])
+            if one_hot:
+                label = np.zeros([CLASS_NUM])
+                label[i] = 1
+            else:
+                label = i
+            length_count = 0
+
             cap = cv2.VideoCapture(PATH + '/' + CLASS[i] + '/' + video)
-            cnt = 0
             while True:
                 ret, frame = cap.read()
                 if ret:
-                    cnt += 1
+                    frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_CUBIC)
+                    # cv2.imshow('test', frame)
+                    # cv2.waitKey(50)
+                    data[length_count, :, :, :] = frame[:, :, :]
+                    length_count += 1
+                    if length_count == depth:
+                        break
                 else:
-                    print(PATH + '/' + CLASS[i] + '/' + video, cnt)
-                    max_frame = max(max_frame, cnt)
                     break
-    print(max_frame)
+            video_length = length_count
+
+            # TODO it may need more readable name
+            np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
+
+
 
 def dataset(PATH, batch_size, proportion, one_hot = True):
     CLASS = os.listdir(PATH)
@@ -156,7 +180,7 @@ def batch_norm(input, name, train, decay = 0.9):
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
+               input_size=None, state_is_tuple=True, activation=tf.nn.tanh, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
@@ -185,7 +209,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             if self._state_is_tuple:
                 c, h = state
             else:
-                c, h = array_ops.split(value=state, num_or_size_splits=2, axis=3)
+                c, h = tf.split(value=state, num_or_size_splits=2, axis=3)
 
             inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters
             out_channel = self._num_filters * 4
@@ -232,10 +256,13 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
             output = max_pooling_3d(input=output, depth=1, height=2, width=2)
         return output
 
-depth = 60 # 6 * 6 + 4
+depth = 100 # 6 * 6 + 4
 height = 38
 width = 46
 batch_size = 16
+
+prestore('hmdb51_org', depth, height, width)
+
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
@@ -279,6 +306,8 @@ correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 
+
+
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -289,7 +318,7 @@ sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
 
-for epoch in range(100):
+for epoch in range(0):
     train_correct = 0
     print(epoch, 'train:')
     for i in range(int(train_num / batch_size)):
@@ -303,7 +332,7 @@ for epoch in range(100):
         if i%20==19:
             print((i+1)*batch_size, train_correct/(i+1)/batch_size)
 
-    train_correct = 0
+    test_correct = 0
     print(epoch, 'test:')
     for i in range(int(test_num / batch_size)):
         data, label = sess.run(test_next_batch)
@@ -311,7 +340,7 @@ for epoch in range(100):
             data, length = load_video(data, depth, height, width)
             length = np.array(length/5).astype(int)
 
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
-            train_correct += num
+            num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
+            test_correct += num
         if i%20==19:
-            print((i+1)*batch_size, train_correct/(i+1)/batch_size)
+            print((i+1)*batch_size, test_correct/(i+1)/batch_size)
