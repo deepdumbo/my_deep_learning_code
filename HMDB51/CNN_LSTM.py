@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import os
 import time
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
     """
@@ -78,9 +79,9 @@ def dataset(PATH, batch_size, epoch_num, proportion):
     data_list = os.listdir(PATH)
     for data_name in data_list:
         if np.random.rand() < proportion:
-            train.append(PATH + '/' + data_name)
-        else:
             test.append(PATH + '/' + data_name)
+        else:
+            train.append(PATH + '/' + data_name)
     train_num = len(train)
     test_num = len(test)
     print(train_num, test_num)
@@ -264,32 +265,32 @@ keep_prob = tf.placeholder("float", shape = [])
 x_ = tf.reshape(x, [-1, 5, height, width, 3])
 print(x.get_shape())
 
-conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 128, padding='VALID')
+conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, padding='VALID')
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 print(pool1.get_shape())
 
-conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256, padding='VALID')
+conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
 batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 print(pool2.get_shape())
 
-lstm_input = tf.transpose(tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 256]), [1, 0, 2, 3, 4]) # to fit the time_major
+lstm_input = tf.transpose(tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 128]), [1, 0, 2, 3, 4]) # to fit the time_major
 print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
 
-reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 256])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 512)
+reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 128])
+fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 128, output_channel = 256)
 batch_fc = batch_norm(input = fc1, name = 'batch_fc', train = BN_train)
 fc_act1 = tf.nn.relu(batch_fc)
 
-y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 512, output_channel = 51))
+y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 256, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
@@ -308,32 +309,28 @@ sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
 
+train_next_batch = train_iterator.get_next()
+test_next_batch = test_iterator.get_next()
+
 for epoch in range(epoch_num):
     train_correct = 0
-    print(epoch, 'train:')
     for i in range(int(train_num / batch_size)):
-        data = sess.run(train_iterator.get_next())
+        data = sess.run(train_next_batch)
         if len(data) == batch_size:
-            t = time.time()
             data, label, length = load_prestored_data(data)
             length = (np.array(length) / 5).astype(int)
-            print('read data time', time.time()-t)
-            t = time.time()
             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5})
-            print('train time', time.time()-t)
             train_correct += num
-        if i%20==19:
-            print((i+1)*batch_size, train_correct/(i+1)/batch_size)
+    print('epoch:%d ' % epoch)
+    print('train accuracy: %f ' % (train_correct / train_num))
 
     test_correct = 0
-    print(epoch, 'test:')
     for i in range(int(test_num / batch_size)):
-        data = sess.run(test_iterator.get_next())
+        data = sess.run(test_next_batch)
         if len(data) == batch_size:
             data, label, length = load_prestored_data(data)
             length = (np.array(length) / 5).astype(int)
 
             num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
             test_correct += num
-        if i%20==19:
-            print((i+1)*batch_size, test_correct/(i+1)/batch_size)
+    print('test accuracy: %f ' % (test_correct / test_num))
