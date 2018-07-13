@@ -3,7 +3,7 @@ import pickle as p
 import numpy as np
 import tensorflow as tf
 import os
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1],
@@ -285,58 +285,34 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 batch_image = np.zeros([batch_size, 32, 32, 3])
 batch_label = np.zeros([batch_size, 10])
 
-with tf.Session() as sess:
-    init = tf.global_variables_initializer()
-    sess.run(init)
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
+sess = tf.Session()
+sess.run(tf.global_variables_initializer())
 
-    # for i in range(0):
-    #     for j in range(int(50000 / batch_size)):
-    #         batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-    #         batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
-    #
-    #         train_step_gabor.run(feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
-    #
-    #         if j % 50 == 49:
-    #             print "step %d" % i
-    #             print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #             print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #             print Theta.eval()
-    #             print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #             print Lambda.eval()
-    #
-    #     for j in range(10000 / batch_size):
-    #         batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-    #         batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
-    #
-    #     print "test:"
-    #     print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #     print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #     print Theta.eval()
-    #     print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-    #     print Lambda.eval()
-    for i in range(200):
-        train_data, train_label, test_data, test_label = data_shullfe(train_data, train_label, test_data, test_label)
+for epoch in range(200):
+    train_data, train_label, test_data, test_label = data_shullfe(train_data, train_label, test_data, test_label)
 
-        train_correct = 0
-        for j in range(int(50000 / batch_size)):
-            batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-            batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
+    train_correct = 0
+    for j in range(int(50000 / batch_size)):
+        batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
+        batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
 
-            _, num = sess.run([train_step, correct_num], feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
-            train_correct += num
-            if i % 20 == 19:
-                print((i + 1) * batch_size, train_correct / (i + 1) / batch_size)
+        _, num = sess.run([train_step, correct_num], feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+        train_correct += num
+    print('epoch:%d ' % epoch)
+    print('train accuracy: %f ' % (train_correct / batch_size))
 
-        test_correct = 0
-        for j in range(int(10000 / batch_size)):
-            batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-            batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
+    test_correct = 0
+    for j in range(int(10000 / batch_size)):
+        batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
+        batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
 
-            _, num = sess.run([train_step, correct_num],
-                              feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
-            test_correct += num
-            if i % 20 == 19:
-                print((i + 1) * batch_size, test_correct / (i + 1) / batch_size)
+        _, num = sess.run([train_step, correct_num],
+                          feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+        test_correct += num
+    print('test accuracy: %f ' % (test_correct / batch_size))
 
 
 
