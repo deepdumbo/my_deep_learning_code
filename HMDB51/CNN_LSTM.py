@@ -2,8 +2,22 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
+import time
 
 def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
+    """
+    Read the video and save it as numpy. We found that cv2.VideoCapture().cap() takes too much time.
+    Args:
+        PATH: 
+        depth: 
+        height: 
+        width: 
+        channel: 
+        one_hot: 
+
+    Returns:
+
+    """
     try:
         os.mkdir('prestored')
     except:
@@ -43,78 +57,56 @@ def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
             np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
 
 
+def dataset(PATH, batch_size, epoch_num, proportion):
+    """
+    Generate the tf.data.dataset. This function return the iterator and sample size. iterator need to be initial as
+        sess.run(iterator.initializer)
+    And you can get batch data as 
+        sess.run(iterator.get_next())
+    Args:
+        PATH: 
+        batch_size: 
+        epoch_num:
+        proportion: The proportion of test data.
 
-def dataset(PATH, batch_size, proportion, one_hot = True):
-    CLASS = os.listdir(PATH)
-    CLASS_NUM = len(CLASS)
+    Returns: [train_iterator, train_num, test_iterator, test_num]
 
-    train_data = np.array([])
-    train_label = np.array([])
+    """
+    train = []
+    test = []
 
-    test_data = np.array([])
-    test_label = np.array([])
-
-    for i in range(CLASS_NUM):
-        data_ = os.listdir(PATH + '/' + CLASS[i])
-        train_data_ = []
-        test_data_ = []
-        for j in range(len(data_)):
-            if np.random.rand() < proportion:
-                test_data_.append(PATH + '/' + CLASS[i] + '/' + data_[j])
-            else:
-                train_data_.append(PATH + '/' + CLASS[i] + '/' + data_[j])
-
-        test_label_ = np.full([len(test_data_)], i)
-        train_label_ = np.full([len(train_data_)], i)
-
-        test_data = np.concatenate((test_data, test_data_), axis=0)
-        test_label = np.concatenate((test_label, test_label_), axis=0)
-        train_data = np.concatenate((train_data, train_data_), axis=0)
-        train_label = np.concatenate((train_label, train_label_), axis=0)
-    if one_hot:
-        train_label = tf.one_hot(train_label, CLASS_NUM, 1, 0)
-        test_label = tf.one_hot(test_label, CLASS_NUM, 1, 0)
-
-    train_num = len(train_data)
-    test_num = len(test_data)
+    data_list = os.listdir(PATH)
+    for data_name in data_list:
+        if np.random.rand() < proportion:
+            train.append(PATH + '/' + data_name)
+        else:
+            test.append(PATH + '/' + data_name)
+    train_num = len(train)
+    test_num = len(test)
     print(train_num, test_num)
 
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_label))
-    train_dataset = train_dataset.shuffle(buffer_size=train_num*2).batch(batch_size).repeat(100)
+    train_dataset = tf.data.Dataset.from_tensor_slices(train)
+    train_dataset = train_dataset.shuffle(buffer_size=train_num*2).batch(batch_size).repeat(epoch_num)
     train_iterator = train_dataset.make_initializable_iterator()
-    train_next_batch = train_iterator.get_next()
 
-    test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_label))
-    test_dataset = test_dataset.shuffle(buffer_size=test_num*2).batch(batch_size).repeat(100)
+    test_dataset = tf.data.Dataset.from_tensor_slices(test)
+    test_dataset = test_dataset.shuffle(buffer_size=test_num*2).batch(batch_size).repeat(epoch_num)
     test_iterator = test_dataset.make_initializable_iterator()
-    test_next_batch = test_iterator.get_next()
-    return train_iterator, train_next_batch, train_num, test_iterator, test_next_batch, test_num
 
-def load_video(filenames, depth, height, width, channel = 3):
-    batch_size = len(filenames)
+    return train_iterator, train_num, test_iterator, test_num
 
-    video = np.zeros([batch_size, depth, height, width, channel])
-    video_length = np.zeros([batch_size])
+def load_prestored_data(PATH):
+    data = []
+    label = []
+    video_length = []
 
-    for i in range(batch_size):
-        cap = cv2.VideoCapture(filenames[i].decode())
-        length_count = 0
-        while True:
-            ret, frame = cap.read()
-            # print(np.shape(frame))
-            if ret:
-                frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_CUBIC)
-                # cv2.imshow('test', frame)
-                # cv2.waitKey(50)
-                video[i, length_count, :, :, :] = frame[:, :, :]
-                length_count += 1
-                if length_count == depth:
-                    break
-            else:
-                break
-        video_length[i] = length_count
+    for data_path in PATH:
+        prestored_data = np.load(data_path.decode())
+        data.append(prestored_data[0])
+        label.append(prestored_data[1])
+        video_length.append(prestored_data[2])
 
-    return video, video_length
+    return data, label, video_length
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
@@ -253,13 +245,15 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
             output = max_pooling_3d(input=output, depth=1, height=2, width=2)
         return output
 
-depth = 100 # 6 * 6 + 4
+
+
+
+epoch_num = 100
+batch_size = 64
+
+depth = 100
 height = 38
 width = 46
-batch_size = 16
-
-prestore('hmdb51_org', depth, height, width)
-
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
@@ -270,28 +264,30 @@ keep_prob = tf.placeholder("float", shape = [])
 x_ = tf.reshape(x, [-1, 5, height, width, 3])
 print(x.get_shape())
 
-conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, padding='VALID')
+conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 128, padding='VALID')
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
+drop1 = tf.nn.dropout(pool1, keep_prob)
 print(pool1.get_shape())
 
-conv2 = conv3d(input = pool1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
+conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256, padding='VALID')
 batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
-
+drop2 = tf.nn.dropout(pool2, keep_prob)
 print(pool2.get_shape())
 
-lstm_input = tf.transpose(tf.reshape(pool2, [batch_size, int(depth/5), 8, 10, 128]), [1, 0, 2, 3, 4]) # to fit the time_major
-# print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
+lstm_input = tf.transpose(tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 256]), [1, 0, 2, 3, 4]) # to fit the time_major
+print(lstm_input.get_shape())
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
 
-reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 128])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 128, output_channel = 512)
-fc_act1 = tf.nn.relu(fc1)
+reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 256])
+fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 512)
+batch_fc = batch_norm(input = fc1, name = 'batch_fc', train = BN_train)
+fc_act1 = tf.nn.relu(batch_fc)
 
 y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 512, output_channel = 51))
 
@@ -302,27 +298,29 @@ correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_next_batch, train_num, test_iterator, test_next_batch, test_num = dataset('hmdb51_org', batch_size, proportion=0.2)
+train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
 
-for epoch in range(0):
+for epoch in range(epoch_num):
     train_correct = 0
     print(epoch, 'train:')
     for i in range(int(train_num / batch_size)):
-        data, label = sess.run(train_next_batch)
+        data = sess.run(train_iterator.get_next())
         if len(data) == batch_size:
-            data, length = load_video(data, depth, height, width)
-            length = np.array(length/5).astype(int)
-
+            t = time.time()
+            data, label, length = load_prestored_data(data)
+            length = (np.array(length) / 5).astype(int)
+            print('read data time', time.time()-t)
+            t = time.time()
             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5})
+            print('train time', time.time()-t)
             train_correct += num
         if i%20==19:
             print((i+1)*batch_size, train_correct/(i+1)/batch_size)
@@ -330,10 +328,10 @@ for epoch in range(0):
     test_correct = 0
     print(epoch, 'test:')
     for i in range(int(test_num / batch_size)):
-        data, label = sess.run(test_next_batch)
+        data = sess.run(test_iterator.get_next())
         if len(data) == batch_size:
-            data, length = load_video(data, depth, height, width)
-            length = np.array(length/5).astype(int)
+            data, label, length = load_prestored_data(data)
+            length = (np.array(length) / 5).astype(int)
 
             num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
             test_correct += num
