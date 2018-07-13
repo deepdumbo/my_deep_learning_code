@@ -1,14 +1,7 @@
 # -*- coding:utf-8 -*-
 import pickle as p
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.image as plimg
-import matplotlib.cm as cm
-# from PIL import Image
-
 import tensorflow as tf
-import cv2
-
 import os
 
 
@@ -100,7 +93,7 @@ def data_shullfe(train_data, train_label, test_data, test_label):
 def load_CIFAR_batch(filename):
     """ load single batch of cifar """
     with open(filename, 'rb')as f:
-        datadict = p.load(f)
+        datadict = p.load(f, encoding='iso-8859-1')
         X = datadict['data']
         Y = datadict['labels']
         X = X.reshape(10000, 3, 32, 32)
@@ -214,10 +207,9 @@ def Gabor_conv(input, Theta, Lambda, name, kernel_size, in_channel, out_channel)
     return res
 
 
-print "read data..."
-
-train_data, train_label, test_data, test_label = load_CIFAR("dataset")
-print "finish"
+print("read data...")
+train_data, train_label, test_data, test_label = load_CIFAR("ori_data")
+print("finish")
 
 batch_size = 100
 x = tf.placeholder("float", shape=[batch_size, 32, 32, 3])
@@ -246,22 +238,19 @@ train_step_gabor = tf.train.AdamOptimizer(1e-3).minimize(MS_loss)
 
 # print Theta.get_shape()
 
-# Gabor = Gabor_filter(tf.reduce_mean(R_theta, 0), tf.reduce_mean(R_lambda, 0), in_channel = 3, out_channel = 16)
-# Gabor_conv_ = tf.nn.conv2d(x, Gabor, strides=[1, 1, 1, 1], padding='SAME')
+Gabor = Gabor_filter(Theta, Lambda, 17, 3, 16)
+Gabor_conv_ = tf.nn.conv2d(x, Gabor, strides=[1, 1, 1, 1], padding='SAME')
 
-Gabor = Gabor_conv(input=x, Theta=R_theta, Lambda=R_lambda, name='Gabor', kernel_size=17, in_channel=3, out_channel=16)
-G_conv1 = conv2d(input=Gabor, name='G_conv1', kernel_size=3, input_channel=16, output_channel=64)
+# Gabor = Gabor_conv(input=x, Theta=R_theta, Lambda=R_lambda, name='Gabor', kernel_size=17, in_channel=3, out_channel=16)
+G_conv1 = conv2d(input=Gabor_conv_, name='G_conv1', kernel_size=3, input_channel=16, output_channel=64)
 G_batch1 = batch_norm(input=G_conv1, name='G_batch1', train=BN_train)
 G_act1 = tf.nn.relu(G_batch1)
 G_pool1 = max_pooling_2d(input=G_act1, width=2, height=2)
-
-
 
 conv1 = conv2d(input=x, name='conv1', kernel_size=3, input_channel=3, output_channel=64)
 batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)
-
 
 concat = tf.concat([pool1, G_pool1], axis = -1)
 #drop1 = tf.nn.dropout(concat, keep_prob)
@@ -288,102 +277,66 @@ y_predict = tf.nn.softmax(fc2)
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
 
-
 correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-batch_image = np.zeros([batch_size, 28, 28, 1])
+batch_image = np.zeros([batch_size, 32, 32, 3])
 batch_label = np.zeros([batch_size, 10])
-
-
-
-
-f = open('RG_CNN.txt', 'a')
 
 with tf.Session() as sess:
     init = tf.global_variables_initializer()
     sess.run(init)
 
-    for i in range(0):
-        for j in range(50000 / batch_size):
-            batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-            batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
-
-            train_step_gabor.run(feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
-
-            if j % 50 == 49:
-                print "step %d" % i
-                print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-                print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-                print Theta.eval()
-                print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-                print Lambda.eval()
-
-        for j in range(10000 / batch_size):
-            batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
-            batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
-
-        print "test:"
-        print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-        print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-        print Theta.eval()
-        print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-        print Lambda.eval()
-
-
-
+    # for i in range(0):
+    #     for j in range(int(50000 / batch_size)):
+    #         batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
+    #         batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
+    #
+    #         train_step_gabor.run(feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+    #
+    #         if j % 50 == 49:
+    #             print "step %d" % i
+    #             print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #             print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #             print Theta.eval()
+    #             print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #             print Lambda.eval()
+    #
+    #     for j in range(10000 / batch_size):
+    #         batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
+    #         batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
+    #
+    #     print "test:"
+    #     print MS_loss.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #     print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #     print Theta.eval()
+    #     print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
+    #     print Lambda.eval()
     for i in range(200):
         train_data, train_label, test_data, test_label = data_shullfe(train_data, train_label, test_data, test_label)
 
-        num = 0
-        total = 0
-        for j in range(50000 / batch_size):
+        train_correct = 0
+        for j in range(int(50000 / batch_size)):
             batch_image = train_data[j * batch_size: (j + 1) * batch_size, :, :, :]
             batch_label = train_label[j * batch_size: (j + 1) * batch_size, :]
 
-            train_step.run(feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
-            num = num + correct_num.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-            total = total + batch_size
+            _, num = sess.run([train_step, correct_num], feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+            train_correct += num
+            if i % 20 == 19:
+                print((i + 1) * batch_size, train_correct / (i + 1) / batch_size)
 
-            if j % 50 == 49:
-                print "step %d, %d / 50000, training accuracy %f" % (i, total, num / total)
-                print R_theta[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-                print R_lambda[0].eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-                # print Gabor.eval()
-                """
-                print Theta.eval(),Lambda.eval()
-                plt.figure("show")
-                img = np.zeros([28, 28])
-                show = np.zeros([28, 28])
-                img = batch_image[1, :, :, 0]
-                plt.imshow(img)
-                plt.show()
-
-                tmp = Gabor_conv.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0})
-                img0 = np.zeros([28, 28])
-                img0 = tmp[1, :, :, 3]
-                plt.imshow(img0, cmap = cm.gray)
-                plt.show()
-                """
-
-        f.write("step %d, training accuracy %f" % (i, num / total))
-        f.write('\n')
-
-        num = 0
-        total = 0
-
-        for j in range(10000 / batch_size):
+        test_correct = 0
+        for j in range(int(10000 / batch_size)):
             batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
             batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
 
-            num = num + correct_num.eval(feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
-            total = total + batch_size
-
-        print "step %d, %d / 10000, test accuracy %f" % (i, total, num / total)
-        f.write("step %d, test accuracy %f" % (i, num / total))
-        f.write('\n')
+            _, num = sess.run([train_step, correct_num],
+                              feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+            test_correct += num
+            if i % 20 == 19:
+                print((i + 1) * batch_size, test_correct / (i + 1) / batch_size)
 
 
 
