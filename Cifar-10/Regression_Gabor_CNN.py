@@ -292,6 +292,7 @@ sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 
 for epoch in range(200):
+    print('epoch:%d ' % epoch)
     train_data, train_label, test_data, test_label = data_shullfe(train_data, train_label, test_data, test_label)
 
     train_correct = 0
@@ -301,17 +302,16 @@ for epoch in range(200):
 
         _, num = sess.run([train_step, correct_num], feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
         train_correct += num
-    print('epoch:%d ' % epoch)
-    print('train accuracy: %f ' % (train_correct / batch_size))
+    print('train accuracy: %f ' % (train_correct / 50000))
 
     test_correct = 0
     for j in range(int(10000 / batch_size)):
         batch_image = test_data[j * batch_size: (j + 1) * batch_size, :, :, :]
         batch_label = test_label[j * batch_size: (j + 1) * batch_size, :]
 
-        num = sess.run(correct_num, feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
+        num = sess.run(correct_num, feed_dict={x: batch_image, y: batch_label, keep_prob: 1.0, BN_train: False})
         test_correct += num
-    print('test accuracy: %f ' % (test_correct / batch_size))
+    print('test accuracy: %f ' % (test_correct / 10000))
 
 
 

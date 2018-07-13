@@ -223,6 +223,9 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float", shape=[])
 BN_train = tf.placeholder("bool", shape=[])
 
+pi = tf.asin(1.0) * 2.0
+Theta = tf.linspace(0.0, pi * 1.5, 4)
+Lambda = tf.linspace(2.0, 6.0, 4)
 Gabor = Gabor_filter(Theta, Lambda, 17, 3, 16)
 Gabor_conv_ = tf.nn.conv2d(x, Gabor, strides=[1, 1, 1, 1], padding='SAME')
 
@@ -232,7 +235,7 @@ G_act1 = tf.nn.relu(G_batch1)
 G_pool1 = max_pooling_2d(input=G_act1, width=2, height=2)
 
 conv1 = conv2d(input=x, name='conv1', kernel_size=3, input_channel=3, output_channel=64)
-conv1_ = conv2d(input=conv1, name='conv1_', kernel_size=3, input_channel=3, output_channel=64, use_bias=False)
+conv1_ = conv2d(input=conv1, name='conv1_', kernel_size=3, input_channel=64, output_channel=64, use_bias=False)
 batch1 = batch_norm(input=conv1_, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)
@@ -287,7 +290,7 @@ for epoch in range(200):
         _, num = sess.run([train_step, correct_num], feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
         train_correct += num
     print('epoch:%d ' % epoch)
-    print('train accuracy: %f ' % (train_correct / batch_size))
+    print('train accuracy: %f ' % (train_correct / 50000))
 
     test_correct = 0
     for j in range(int(10000 / batch_size)):
@@ -296,7 +299,7 @@ for epoch in range(200):
 
         num = sess.run(correct_num, feed_dict={x: batch_image, y: batch_label, keep_prob: 0.5, BN_train: True})
         test_correct += num
-    print('test accuracy: %f ' % (test_correct / batch_size))
+    print('test accuracy: %f ' % (test_correct / 10000))
 
 
 
