@@ -2,9 +2,6 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
-import time
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
 
 def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
     try:
@@ -273,30 +270,30 @@ keep_prob = tf.placeholder("float", shape = [])
 x_ = tf.reshape(x, [-1, 5, height, width, 3])
 print(x.get_shape())
 
-conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 32, padding='VALID')
+conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, padding='VALID')
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
 print(pool1.get_shape())
 
-conv2 = conv3d(input = pool1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 32, output_channel = 32, padding='VALID')
+conv2 = conv3d(input = pool1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
 batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
 
 print(pool2.get_shape())
 
-lstm_input = tf.transpose(tf.reshape(pool2, [batch_size, int(depth/5), 8, 10, 32]), [1, 0, 2, 3, 4]) # to fit the time_major
-print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 32, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
+lstm_input = tf.transpose(tf.reshape(pool2, [batch_size, int(depth/5), 8, 10, 128]), [1, 0, 2, 3, 4]) # to fit the time_major
+# print(lstm_input.get_shape())
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
 
-reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 32])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 32, output_channel = 128)
+reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 128])
+fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 128, output_channel = 512)
 fc_act1 = tf.nn.relu(fc1)
 
-y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 128, output_channel = 51))
+y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 512, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
@@ -304,8 +301,6 @@ correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-
 
 
 config = tf.ConfigProto()
