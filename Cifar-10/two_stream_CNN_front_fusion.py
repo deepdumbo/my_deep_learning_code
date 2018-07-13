@@ -20,10 +20,13 @@ def conv3d(input, name, depth, kernel_size, input_channel, output_channel, depth
     return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding='SAME'), b)
 
 
-def conv2d(input, name, kernel_size, input_channel, output_channel):
+def conv2d(input, name, kernel_size, input_channel, output_channel, use_bias = True):
     W = tf.get_variable(name=name + '_Weight', shape=[kernel_size, kernel_size, input_channel, output_channel])
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel])
-    return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME'), b)
+    if use_bias:
+        b = tf.get_variable(name=name + '_bias', shape=[output_channel])
+        return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME'), b)
+    else:
+        return tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME')
 
 
 def conv2d_to_1_mul_1(input, name, input_channel, output_channel):
@@ -35,10 +38,13 @@ def conv2d_to_1_mul_1(input, name, input_channel, output_channel):
     return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='VALID'), b)
 
 
-def fc(input, name, input_channel, output_channel):
+def fc(input, name, input_channel, output_channel, use_bias = True):
     W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel])
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel])
-    return tf.matmul(input, W) + b
+    if use_bias:
+        b = tf.get_variable(name=name + '_bias', shape=[output_channel])
+        return tf.matmul(input, W) + b
+    else:
+        return tf.matmul(input, W)
 
 
 def batch_norm(input, name, train, decay=0.9):
@@ -217,62 +223,41 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float", shape=[])
 BN_train = tf.placeholder("bool", shape=[])
 
-R_conv1 = conv2d(input=x, name='R_conv1', kernel_size=3, input_channel=3, output_channel=64)
-R_batch1 = batch_norm(input=R_conv1, name='R_batch1', train=BN_train)
-R_act1 = tf.nn.relu(R_batch1)
-R_pool1 = max_pooling_2d(input=R_act1, width=2, height=2)
-
-R_conv2 = conv2d(input=R_pool1, name='R_conv2', kernel_size=3, input_channel=64, output_channel=128)
-R_batch2 = batch_norm(input=R_conv2, name='R_batch2', train=BN_train)
-R_act2 = tf.nn.relu(R_batch2)
-R_pool2 = max_pooling_2d(input=R_act2, width=2, height=2)
-
-R_theta = tf.reshape(conv2d_to_1_mul_1(input = R_pool2, name = 'R_theta', input_channel = 128, output_channel = 4), [batch_size, 4])
-R_lambda = tf.reshape(conv2d_to_1_mul_1(input = R_pool2, name = 'R_lambda', input_channel = 128, output_channel = 4), [batch_size, 4])
-
-pi = tf.asin(1.0) * 2.0
-Theta = tf.linspace(0.0, pi * 1.5, 4)
-Lambda = tf.linspace(2.0, 6.0, 4)
-MS_loss = tf.reduce_mean(tf.square(R_theta - Theta)) + tf.reduce_mean(tf.square(R_lambda - Lambda))
-train_step_gabor = tf.train.AdamOptimizer(1e-3).minimize(MS_loss)
-
-# print Theta.get_shape()
-
 Gabor = Gabor_filter(Theta, Lambda, 17, 3, 16)
 Gabor_conv_ = tf.nn.conv2d(x, Gabor, strides=[1, 1, 1, 1], padding='SAME')
 
-# Gabor = Gabor_conv(input=x, Theta=R_theta, Lambda=R_lambda, name='Gabor', kernel_size=17, in_channel=3, out_channel=16)
-G_conv1 = conv2d(input=Gabor_conv_, name='G_conv1', kernel_size=3, input_channel=16, output_channel=64)
+G_conv1 = conv2d(input=Gabor_conv_, name='G_conv1', kernel_size=3, input_channel=16, output_channel=64, use_bias=False)
 G_batch1 = batch_norm(input=G_conv1, name='G_batch1', train=BN_train)
 G_act1 = tf.nn.relu(G_batch1)
 G_pool1 = max_pooling_2d(input=G_act1, width=2, height=2)
 
 conv1 = conv2d(input=x, name='conv1', kernel_size=3, input_channel=3, output_channel=64)
-batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
+conv1_ = conv2d(input=conv1, name='conv1_', kernel_size=3, input_channel=3, output_channel=64, use_bias=False)
+batch1 = batch_norm(input=conv1_, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)
 
 concat = tf.concat([pool1, G_pool1], axis = -1)
 #drop1 = tf.nn.dropout(concat, keep_prob)
 
-conv2 = conv2d(input=concat, name='conv2', kernel_size=3, input_channel=128, output_channel=128)
+conv2 = conv2d(input=concat, name='conv2', kernel_size=3, input_channel=128, output_channel=256)
 batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_2d(input=act2, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
-conv3 = conv2d(input=drop2, name='conv3', kernel_size=3, input_channel=128, output_channel=128)
+conv3 = conv2d(input=drop2, name='conv3', kernel_size=3, input_channel=256, output_channel=256)
 batch3 = batch_norm(input=conv3, name='batch3', train=BN_train)
 act3 = tf.nn.relu(batch3)
 pool3 = max_pooling_2d(input=act3, width=2, height=2)
 drop3 = tf.nn.dropout(pool3, keep_prob)
 
-fc1 = fc(input=tf.reshape(drop3, [-1, 4 * 4 * 128]), name='fc1', input_channel=4 * 4 * 128, output_channel=128)
+fc1 = fc(input=tf.reshape(drop3, [-1, 4 * 4 * 256]), name='fc1', input_channel=4 * 4 * 256, output_channel=256)
 fc1_batch = batch_norm(input=fc1, name='fc_batch', train=BN_train)
 fc1_act = tf.nn.relu(fc1_batch)
 #drop4 = tf.nn.dropout(fc1_act, keep_prob)
 
-fc2 = fc(input=fc1_act, name='fc2', input_channel=128, output_channel=10)
+fc2 = fc(input=fc1_act, name='fc2', input_channel=256, output_channel=10)
 y_predict = tf.nn.softmax(fc2)
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
