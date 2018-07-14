@@ -8,7 +8,7 @@ import shutil
 PATH = 'data/video'
 path_action = os.listdir(PATH)
 for action in path_action:
-    print action
+    print(action)
     path_video = os.listdir(PATH + '/' + action)
     train_cnt = 0
     test_cnt = 0
@@ -30,7 +30,7 @@ for action in path_action:
                     cv2.imwrite(path_save + str(i) + '.jpg', frame)
                     # cv2.imshow("capture", frame)
                 else:
-                    print 'error:' + video + 'only have ' + str(i) + 'frames!'
+                    print('error:' + video + 'only have ' + str(i) + 'frames!')
                     shutil.rmtree(path_save)
                     test_cnt = test_cnt - 1
                     break
@@ -47,7 +47,7 @@ for action in path_action:
                     cv2.imwrite(path_save + str(i) + '.jpg', frame)
                     # cv2.imshow("capture", frame)
                 else:
-                    print 'error:' + video + 'only have ' + str(i) + 'frames!'
+                    print('error:' + video + 'only have ' + str(i) + 'frames!')
                     shutil.rmtree(path_save)
                     train_cnt = train_cnt - 1
                     break

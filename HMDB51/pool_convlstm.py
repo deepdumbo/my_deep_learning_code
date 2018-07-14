@@ -1,12 +1,11 @@
 # -*- coding:utf-8 -*-
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import convlstm
 import tensorflow as tf
 import random
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
@@ -106,7 +105,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             if self._state_is_tuple:
                 c, h = state
             else:
-                c, h = array_ops.split(value=state, num_or_size_splits=2, axis=3)
+                c, h = tf.split(value=state, num_or_size_splits=2, axis=3)
 
             inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters
             out_channel = self._num_filters * 4
@@ -167,18 +166,13 @@ def data_shullfe(train_data, train_label, test_data, test_label):
 
 
 
-print 'read data...'
+print('read data...')
 PATH = 'data/numpy/'
 train_data = np.load(PATH + "train_data.npy")
 train_label = np.load(PATH + "train_label.npy")
 test_data = np.load(PATH + "test_data.npy")
 test_label = np.load(PATH + "test_label.npy")
-print 'finish'
-
-sess = tf.InteractiveSession()
-
-
-
+print('finish')
 
 depth = 40 # 6 * 6 + 4
 height = 32
@@ -210,8 +204,8 @@ act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 5, width = 2, height = 2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
-print conv1.get_shape()
-print drop2.get_shape()
+print(conv1.get_shape())
+print(drop2.get_shape())
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', num_filters = 128, kernel_size = [3, 3], keep_prob = keep_prob, batch_size = batch_size, train = BN_train)
@@ -236,6 +230,13 @@ correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
+
+
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
+sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 
 
@@ -247,38 +248,32 @@ test_batch_image = np.zeros([test_batch_size, depth, height, width, 3])
 test_batch_label = np.zeros([test_batch_size, 11])
 learning_rate = 1e-3
 f = open('5_pool.txt', 'a')
-for i in range(200):
+for epoch in range(200):
     train_data, train_label, test_data, test_label = data_shullfe(train_data, train_label, test_data, test_label)
 
-    num = 0
-    total = 0
-    for j in range(5068 / train_batch_size):
+    train_correct = 0
+    train_num = 5072
+    for j in range(int(train_num / train_batch_size)):
         train_batch_image = train_data[j*train_batch_size : (j+1)*train_batch_size, :, :, :, :]
         train_batch_label = train_label[j*train_batch_size : (j+1)*train_batch_size, :]
 
+        num, _ = sess.run([correct_num, train_step], feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 0.5, BN_train: True, lr: learning_rate})
+        train_correct += num
+    print('epoch:%d ' % epoch)
+    print('train accuracy: %f ' % (train_correct / train_num))
+    f.write('epoch:%d ' % epoch)
+    f.write('train accuracy: %f ' % (train_correct / train_num))
 
-        train_step.run(feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 0.5, BN_train: True, lr: learning_rate})
-        num = num + correct_num.eval(feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 1.0, BN_train: True, lr: learning_rate})
-        total = total + train_batch_size
-
-        if j % 10 == 9:
-            print "step %d, %d / 5068, training accuracy %f"%(i, total, num/total)
-    f.write("step %d, training accuracy %f" % (i, num / total))
-    f.write('\n')
-
-    num = 0
-    total = 0
-
-    for j in range(1306 / test_batch_size):
+    test_correct = 0
+    test_num = 1302
+    for j in range(int(test_num / test_batch_size)):
         test_batch_image = test_data[j*test_batch_size : (j+1)*test_batch_size, :, :, :, :]
         test_batch_label = test_label[j*test_batch_size : (j+1)*test_batch_size, :]
 
-        num = num + correct_num.eval(feed_dict={batch_size: test_batch_size, x: test_batch_image, y: test_batch_label, keep_prob: 1.0, BN_train: False, lr: learning_rate})
-        total = total + test_batch_size
-
-    print "step %d, test accuracy %f"%(i, num/total)
-    f.write("step %d, test accuracy %f" % (i, num / total))
-    f.write('\n')
+        num =  sess.run(correct_num, feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 0.5, BN_train: True, lr: learning_rate})
+        test_correct += num
+    print('test accuracy: %f ' % (test_correct / test_num))
+    f.write('test accuracy: %f ' % (test_correct / test_num))
 
 
 

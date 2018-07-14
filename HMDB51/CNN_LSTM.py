@@ -261,6 +261,7 @@ y = tf.placeholder("float", shape = [batch_size, 51])
 sequence_length = tf.placeholder('int32', shape = [batch_size])
 BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
+learning_rate = tf.placeholder('float', shape = [])
 
 x_ = tf.reshape(x, [-1, 5, height, width, 3])
 print(x.get_shape())
@@ -293,7 +294,7 @@ fc_act1 = tf.nn.relu(batch_fc)
 y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 256, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
-train_step = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
@@ -312,6 +313,9 @@ sess.run(test_iterator.initializer)
 train_next_batch = train_iterator.get_next()
 test_next_batch = test_iterator.get_next()
 
+
+lr = 1e-3
+f = open('CNN_LSTM_res.txt', 'a')
 for epoch in range(epoch_num):
     train_correct = 0
     for i in range(int(train_num / batch_size)):
@@ -319,10 +323,12 @@ for epoch in range(epoch_num):
         if len(data) == batch_size:
             data, label, length = load_prestored_data(data)
             length = (np.array(length) / 5).astype(int)
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5})
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             train_correct += num
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
+    f.write('epoch:%d ' % epoch)
+    f.write('train accuracy: %f ' % (train_correct / train_num))
 
     test_correct = 0
     for i in range(int(test_num / batch_size)):
@@ -334,3 +340,9 @@ for epoch in range(epoch_num):
             num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
+    f.write('test accuracy: %f ' % (test_correct / test_num))
+
+    if train_correct / train_num > 0.35:
+        lr = 1e-4
+    else:
+        lr = 1e-3

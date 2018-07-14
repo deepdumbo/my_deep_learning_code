@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
@@ -11,10 +11,10 @@ def read_data(rate = 0.8):
     width = 40
 
 
-    train_data = np.zeros([5068, depth, height, width, 3])
-    train_label = np.zeros([5068, 51])
-    test_data = np.zeros([1306, depth, height, width, 3])
-    test_label = np.zeros([1306, 51])
+    train_data = np.zeros([5072, depth, height, width, 3])
+    train_label = np.zeros([5072, 51])
+    test_data = np.zeros([1302, depth, height, width, 3])
+    test_label = np.zeros([1302, 51])
 
     PATH = 'data/image'
     path_action = os.listdir(PATH + '/train')
@@ -25,7 +25,7 @@ def read_data(rate = 0.8):
     for action in path_action:
         path_video = os.listdir(PATH+'/train/'+action)
         num = len(path_video)
-        print action, num
+        print(action, num)
         for video in path_video:
             for i in range(depth):
                 img = cv2.imread(PATH + '/train/' + action + '/' + video + '/' + str(i) + '.jpg')
@@ -40,7 +40,7 @@ def read_data(rate = 0.8):
 
         path_video = os.listdir(PATH + '/test/' + action)
         num = len(path_video)
-        print action, num
+        print(action, num)
         for video in path_video:
             for i in range(depth):
                 img = cv2.imread(PATH + '/test/' + action + '/' + video + '/' + str(i) + '.jpg')
@@ -54,8 +54,8 @@ def read_data(rate = 0.8):
             batch_test_num = batch_test_num + 1
 
         action_num = action_num + 1
-    print 'train num:', batch_train_num
-    print 'test num:', batch_test_num
+    print('train num:', batch_train_num)
+    print('test num:', batch_test_num)
 
 
 
