@@ -261,8 +261,8 @@ for epoch in range(200):
         train_correct += num
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
-    f.write('epoch:%d ' % epoch)
-    f.write('train accuracy: %f ' % (train_correct / train_num))
+    f.write('epoch:%d ' % epoch + '\n')
+    f.write('train accuracy: %f ' % (train_correct / train_num) + '\n')
 
     test_correct = 0
     test_num = 1302
@@ -270,10 +270,16 @@ for epoch in range(200):
         test_batch_image = test_data[j*test_batch_size : (j+1)*test_batch_size, :, :, :, :]
         test_batch_label = test_label[j*test_batch_size : (j+1)*test_batch_size, :]
 
-        num =  sess.run(correct_num, feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 0.5, BN_train: True, lr: learning_rate})
+        num =  sess.run(correct_num, feed_dict={batch_size: test_batch_size, x: test_batch_image, y: test_batch_label, keep_prob: 1.0, BN_train: False})
         test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
-    f.write('test accuracy: %f ' % (test_correct / test_num))
+    f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
+
+
+    if train_correct / train_num > 0.43:
+        learning_rate = 1e-4
+    else:
+        learning_rate = 1e-3
 
 
 

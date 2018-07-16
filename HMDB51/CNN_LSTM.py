@@ -250,7 +250,7 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
 
 
 epoch_num = 100
-batch_size = 64
+batch_size = 32
 
 depth = 100
 height = 38
@@ -279,19 +279,36 @@ act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 print(pool2.get_shape())
-
 lstm_input = tf.transpose(tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 128]), [1, 0, 2, 3, 4]) # to fit the time_major
+
+# conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1, padding='VALID')
+# batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
+# act1 = tf.nn.relu(batch1)
+# pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
+# drop1 = tf.nn.dropout(pool1, keep_prob)
+
+# conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, depth_strides = 1, padding='VALID')
+# batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
+# act2 = tf.nn.relu(batch2)
+# pool2 = max_pooling_3d(input = act2, depth = 5, width = 2, height = 2)
+# drop2 = tf.nn.dropout(pool2, keep_prob)
+
+# lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
+
+print(conv1.get_shape())
+print(drop2.get_shape())
+
 print(lstm_input.get_shape())
 convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, output_h=True)
 
-reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 128])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 128, output_channel = 256)
+reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 256])
+fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 128)
 batch_fc = batch_norm(input = fc1, name = 'batch_fc', train = BN_train)
 fc_act1 = tf.nn.relu(batch_fc)
 
-y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 256, output_channel = 51))
+y_predict = tf.nn.softmax(fc(fc_act1, name = 'fc2', input_channel = 128, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
@@ -319,6 +336,7 @@ f = open('CNN_LSTM_res.txt', 'a')
 for epoch in range(epoch_num):
     train_correct = 0
     for i in range(int(train_num / batch_size)):
+        # print(i)
         data = sess.run(train_next_batch)
         if len(data) == batch_size:
             data, label, length = load_prestored_data(data)
@@ -335,14 +353,16 @@ for epoch in range(epoch_num):
         data = sess.run(test_next_batch)
         if len(data) == batch_size:
             data, label, length = load_prestored_data(data)
+            # print(length)
             length = (np.array(length) / 5).astype(int)
+            # print(length)
 
             num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num))
 
-    if train_correct / train_num > 0.35:
+    if test_correct / test_num > 0.35:
         lr = 1e-4
     else:
         lr = 1e-3
