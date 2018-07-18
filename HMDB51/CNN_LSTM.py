@@ -267,16 +267,16 @@ x_ = tf.reshape(x, [-1, 5, height, width, 3])
 print(x.get_shape())
 
 conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, padding='VALID')
-conv1_ = conv3d(input = conv1, name = 'conv1_', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 64)
-batch1 = batch_norm(input = conv1_, name = 'batch1', train = BN_train)
+# conv1_ = conv3d(input = conv1, name = 'conv1_', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 64)
+batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 print(pool1.get_shape())
 
-conv2 = conv3d(input = pool1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
-conv2_ = conv3d(input = conv2, name = 'conv2_', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 128)
-batch2 = batch_norm(input = conv2_, name = 'batch2', train = BN_train)
+conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
+# conv2_ = conv3d(input = conv2, name = 'conv2_', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 128)
+batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
@@ -284,14 +284,14 @@ print(pool2.get_shape())
 
 reshape = tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 128])
 
-conv3 = conv3d(input = reshape, name = 'conv3', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256)
-conv3_ = conv3d(input = conv3, name = 'conv3_', depth = 3, kernel_size = 3, input_channel = 256, output_channel = 256)
-batch3 = batch_norm(input = conv3_, name = 'batch3', train = BN_train)
-act3 = tf.nn.relu(batch3)
-drop3 = tf.nn.dropout(act3, keep_prob)
-print(drop3.get_shape())
+# conv3 = conv3d(input = reshape, name = 'conv3', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256)
+# conv3_ = conv3d(input = conv3, name = 'conv3_', depth = 3, kernel_size = 3, input_channel = 256, output_channel = 256)
+# batch3 = batch_norm(input = conv3_, name = 'batch3', train = BN_train)
+# act3 = tf.nn.relu(batch3)
+# drop3 = tf.nn.dropout(act3, keep_prob)
+# print(drop3.get_shape())
 
-lstm_input = tf.transpose(act3, [1, 0, 2, 3, 4]) # to fit the time_major
+lstm_input = tf.transpose(reshape, [1, 0, 2, 3, 4]) # to fit the time_major
 
 # conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1, padding='VALID')
 # batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
@@ -308,17 +308,17 @@ lstm_input = tf.transpose(act3, [1, 0, 2, 3, 4]) # to fit the time_major
 # lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 print(lstm_input.get_shape())
-# convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = lstm_input, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
 convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, output_h=True)
 
 reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 256])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 128)
+fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 256)
 batch_fc = batch_norm(input = fc1, name = 'batch_fc', train = BN_train)
 fc_act1 = tf.nn.relu(batch_fc)
 fc_drop = tf.nn.dropout(fc_act1, keep_prob)
 
-y_predict = tf.nn.softmax(fc(fc_drop, name = 'fc2', input_channel = 128, output_channel = 51))
+y_predict = tf.nn.softmax(fc(fc_drop, name = 'fc2', input_channel = 256, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
