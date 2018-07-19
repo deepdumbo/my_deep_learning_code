@@ -247,7 +247,7 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
 
 
 epoch_num = 100
-batch_size = 32
+batch_size = 16
 
 depth = 40
 height = 32
@@ -305,7 +305,7 @@ drop2 = tf.nn.dropout(pool2, keep_prob)
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
 convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 
@@ -352,6 +352,8 @@ for epoch in range(epoch_num):
         if len(data) == batch_size:
             data, label, length = load_prestored_data(data)
             length = (np.array(length) / 5).astype(int)
+            # print(np.shape(data), np.shape(label))
+            # print(label)
             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             train_correct += num
     print('epoch:%d ' % epoch)

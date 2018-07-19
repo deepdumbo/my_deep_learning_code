@@ -242,9 +242,9 @@ sess.run(tf.global_variables_initializer())
 train_batch_size = 25
 test_batch_size = 25
 train_batch_image = np.zeros([train_batch_size, depth, height, width, 3])
-train_batch_label = np.zeros([train_batch_size, 11])
+train_batch_label = np.zeros([train_batch_size, 51])
 test_batch_image = np.zeros([test_batch_size, depth, height, width, 3])
-test_batch_label = np.zeros([test_batch_size, 11])
+test_batch_label = np.zeros([test_batch_size, 51])
 learning_rate = 1e-3
 f = open('5_pool.txt', 'a')
 for epoch in range(200):
@@ -253,8 +253,9 @@ for epoch in range(200):
     train_correct = 0
     train_num = 5072
     for j in range(int(train_num / train_batch_size)):
-        train_batch_image = train_data[j*train_batch_size : (j+1)*train_batch_size, :, :, :, :]
-        train_batch_label = train_label[j*train_batch_size : (j+1)*train_batch_size, :]
+        train_batch_image[:,:,:,:] = train_data[j*train_batch_size : (j+1)*train_batch_size, :, :, :, :]
+        train_batch_label[:,:] = train_label[j*train_batch_size : (j+1)*train_batch_size, :]
+        # print(np.shape(train_batch_label))
 
         num, _ = sess.run([correct_num, train_step], feed_dict={batch_size: train_batch_size, x: train_batch_image, y: train_batch_label, keep_prob: 0.5, BN_train: True, lr: learning_rate})
         train_correct += num
