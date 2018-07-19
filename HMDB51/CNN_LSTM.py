@@ -221,18 +221,16 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             return new_h, new_state
 
 def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train, keep_prob = 1.0, pool = False, output_h = False):
-    shape = input.get_shape() #[time, batch, height, width, channel]
+    shape = input.get_shape().as_list() #[time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
-    init_state = cell.zero_state(batch_size, dtype=tf.float32)
+    init_state = cell.zero_state(shape[1], dtype=tf.float32)
 
     output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, time_major=True)
     #output, state = tf.nn.dynamic_rnn(cell, inputs=input, sequence_length=sequence_length, initial_state=init_state, time_major=True)
 
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
-
-
 
     if output_h:
         if pool:
@@ -246,8 +244,6 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
         if pool:
             output = max_pooling_3d(input=output, depth=1, height=2, width=2)
         return output
-
-
 
 
 epoch_num = 100
@@ -311,15 +307,16 @@ lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 print(lstm_input.get_shape())
 convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, output_h=True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 
-reshape = tf.reshape(convlstm3, [-1, 4 * 5 * 256])
+lstm_output = convlstm3[-1, :, :, :, :]
+reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
 fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 256)
-batch_fc = batch_norm(input = fc1, name = 'batch_fc', train = BN_train)
-fc_act1 = tf.nn.relu(batch_fc)
-fc_drop = tf.nn.dropout(fc_act1, keep_prob)
+fc_batch1 = batch_norm(input = fc1, name = 'fc_batch1', train = BN_train)
+fc_act1 = tf.nn.relu(fc_batch1)
+fc_drop1 = tf.nn.dropout(fc_act1, keep_prob)
 
-y_predict = tf.nn.softmax(fc(fc_drop, name = 'fc2', input_channel = 256, output_channel = 51))
+y_predict = tf.nn.softmax(fc(fc_drop1, name = 'fc2', input_channel = 256, output_channel = 51))
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
@@ -334,7 +331,7 @@ session = tf.Session(config=config)
 sess = tf.Session()
 
 
-prestore('hmdb51_org', depth, height, width)
+# prestore('hmdb51_org', depth, height, width)
 
 train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
 sess.run(tf.global_variables_initializer())

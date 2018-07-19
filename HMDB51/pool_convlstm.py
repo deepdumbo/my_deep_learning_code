@@ -204,10 +204,9 @@ act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 5, width = 2, height = 2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
-print(conv1.get_shape())
-print(drop2.get_shape())
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
+print(lstm_input.get_shape())
 convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', num_filters = 128, kernel_size = [3, 3], keep_prob = keep_prob, batch_size = batch_size, train = BN_train)
 convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, batch_size = batch_size, train = BN_train, pool = True)
 convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, batch_size = batch_size, train = BN_train)
