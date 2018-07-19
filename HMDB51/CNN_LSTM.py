@@ -49,13 +49,13 @@ def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
                     data[length_count, :, :, :] = frame[:, :, :]
                     length_count += 1
                     if length_count == depth:
-                        break
+                        np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label]))
                 else:
                     break
             video_length = length_count
 
             # TODO it may need more readable name
-            np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
+            # np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
 
 
 def dataset(PATH, batch_size, epoch_num, proportion):
@@ -87,7 +87,7 @@ def dataset(PATH, batch_size, epoch_num, proportion):
     print(train_num, test_num)
 
     train_dataset = tf.data.Dataset.from_tensor_slices(train)
-    train_dataset = train_dataset.shuffle(buffer_size=train_num*2).batch(batch_size).repeat(epoch_num)
+    train_dataset = train_dataset.shuffle(buffer_size=train_num*10).batch(batch_size).repeat(epoch_num)
     train_iterator = train_dataset.make_initializable_iterator()
 
     test_dataset = tf.data.Dataset.from_tensor_slices(test)
@@ -99,15 +99,16 @@ def dataset(PATH, batch_size, epoch_num, proportion):
 def load_prestored_data(PATH):
     data = []
     label = []
-    video_length = []
+    # video_length = []
 
     for data_path in PATH:
         prestored_data = np.load(data_path.decode())
         data.append(prestored_data[0])
         label.append(prestored_data[1])
-        video_length.append(prestored_data[2])
+        # video_length.append(prestored_data[2])
 
-    return data, label, video_length
+    # return data, label, video_length
+    return data, label
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
@@ -331,7 +332,7 @@ session = tf.Session(config=config)
 sess = tf.Session()
 
 
-# prestore('hmdb51_org', depth, height, width)
+prestore('hmdb51_org', depth, height, width)
 
 train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
 sess.run(tf.global_variables_initializer())
@@ -350,11 +351,12 @@ for epoch in range(epoch_num):
         # print(i)
         data = sess.run(train_next_batch)
         if len(data) == batch_size:
-            data, label, length = load_prestored_data(data)
-            length = (np.array(length) / 5).astype(int)
+            # data, label, length = load_prestored_data(data)
+            # length = (np.array(length) / 5).astype(int)
             # print(np.shape(data), np.shape(label))
             # print(label)
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.5, learning_rate: lr})
+            data, label = load_prestored_data(data)
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             train_correct += num
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
@@ -365,12 +367,12 @@ for epoch in range(epoch_num):
     for i in range(int(test_num / batch_size)):
         data = sess.run(test_next_batch)
         if len(data) == batch_size:
-            data, label, length = load_prestored_data(data)
+            # data, label, length = load_prestored_data(data)
             # print(length)
-            length = (np.array(length) / 5).astype(int)
+            # length = (np.array(length) / 5).astype(int)
             # print(length)
-
-            num = sess.run(correct_num, feed_dict={x: data, y: label, sequence_length: length, BN_train: False, keep_prob: 1.0})
+            data, label = load_prestored_data(data)
+            num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num))
