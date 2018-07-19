@@ -181,7 +181,6 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
         self._activation = activation
         self._name = name
 
-
         self._reuse = reuse
 
     @property
@@ -227,7 +226,9 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(batch_size, dtype=tf.float32)
 
-    output, state = tf.nn.dynamic_rnn(cell, inputs=input, sequence_length=sequence_length, initial_state=init_state, time_major=True)
+    output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, time_major=True)
+    #output, state = tf.nn.dynamic_rnn(cell, inputs=input, sequence_length=sequence_length, initial_state=init_state, time_major=True)
+
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
 
@@ -252,9 +253,9 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
 epoch_num = 100
 batch_size = 32
 
-depth = 100
-height = 38
-width = 46
+depth = 40
+height = 32
+width = 40
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
@@ -331,6 +332,9 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
+
+
+prestore('hmdb51_org', depth, height, width)
 
 train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
 sess.run(tf.global_variables_initializer())
