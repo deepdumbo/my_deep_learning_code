@@ -76,7 +76,7 @@ def lstm_cell(hidden_size):
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
+               input_size=None, state_is_tuple=True, activation=tf.nn.relu, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
@@ -132,7 +132,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
 
 def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, batch_size, train, pool = False):
-    shape = input.get_shape() #[time, batch, height, width, channel]
+    shape = input.get_shape().as_list() #[time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(batch_size, dtype=tf.float32)

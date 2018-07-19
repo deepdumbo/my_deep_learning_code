@@ -294,13 +294,13 @@ print(x.get_shape())
 
 # lstm_input = tf.transpose(reshape, [1, 0, 2, 3, 4]) # to fit the time_major
 
-conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1, padding='VALID')
+conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1)
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 
-conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, depth_strides = 1, padding='VALID')
+conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, depth_strides = 1)
 batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 5, width = 2, height = 2)
