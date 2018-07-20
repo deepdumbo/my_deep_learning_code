@@ -6,7 +6,6 @@ import time
 from My_dataset_class import MyDataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-
 def dataset(PATH, batch_size, epoch_num):
     """
     Generate the tf.data.dataset. This function return the iterator and sample size. iterator need to be initial as
@@ -251,13 +250,11 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num)
-sess.run(tf.global_variables_initializer())
-sess.run(train_iterator.initializer)
-sess.run(test_iterator.initializer)
+DATA = MyDataset('data', batch_size)
+train_num = DATA.train_num
+test_num = DATA.test_num
 
-train_next_batch = train_iterator.get_next()
-test_next_batch = test_iterator.get_next()
+sess.run(tf.global_variables_initializer())
 
 lr = 1e-3
 f = open('CNN_LSTM_res.txt', 'a')
@@ -265,13 +262,13 @@ for epoch in range(epoch_num):
     train_correct = 0
     for i in range(int(train_num / batch_size)):
         print(i)
-        data, label = sess.run(train_next_batch)
+        data, label = DATA.train_get_next()
         if len(data) == batch_size:
             t = time.time()
             data = load_prestored_data(data, depth, height, width)
             print(time.time() - t)
             t = time.time()
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y_: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             print(time.time() - t)
             train_correct += num
 
@@ -281,11 +278,11 @@ for epoch in range(epoch_num):
     f.write('train accuracy: %f ' % (train_correct / train_num) + '\n')
 
     test_correct = 0
-    for i in range(int(test_num / batch_size)):
-        data, label = sess.run(test_next_batch)
+    for i in range(int(DATA.test_num / batch_size)):
+        data, label = DATA.test_get_next()
         if len(data) == batch_size:
             data = load_prestored_data(data, depth, height, width)
-            num = sess.run(correct_num, feed_dict={x: data, y_: label, BN_train: False, keep_prob: 1.0})
+            num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
