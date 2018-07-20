@@ -27,7 +27,7 @@ def read_data(rate = 0.8):
         print(action, num)
         for video in path_video:
             data = np.zeros([depth, height, width, 3])
-            label = np.zeros([51])
+            label = np.zeros([])
 
             for i in range(depth):
                 img = cv2.imread(PATH + '/train/' + action + '/' + video + '/' + str(i) + '.jpg')
@@ -37,7 +37,7 @@ def read_data(rate = 0.8):
                 #cv2.waitKey(300)
                 print(type(img))
                 data[i, :, :, :] = img[:, :, :]
-            label[action_num] = 1
+            label = action_num
 
             path_save = 'data/numpy/train/' + str(batch_train_num)
             if not os.path.exists(path_save):

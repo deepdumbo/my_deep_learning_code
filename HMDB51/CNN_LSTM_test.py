@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import os
 import time
+from My_dataset_class import MyDataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
