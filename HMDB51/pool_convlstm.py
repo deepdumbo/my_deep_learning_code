@@ -76,7 +76,7 @@ def lstm_cell(hidden_size):
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.relu, reuse=None):
+               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
@@ -220,17 +220,12 @@ fc_drop1 = tf.nn.dropout(fc_act1, keep_prob)
 
 y_predict = tf.nn.softmax(fc(fc_drop1, name = 'fc2', input_channel = 256, output_channel = 51))
 
-
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-#train_step = tf.train.GradientDescentOptimizer(lr).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_predict, 1), tf.argmax(y, 1))
 
 correct_num = tf.reduce_sum(tf.cast(correct_prediction, "float"))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-
-
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -239,8 +234,8 @@ sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 
 
-train_batch_size = 25
-test_batch_size = 25
+train_batch_size = 32
+test_batch_size = 32
 train_batch_image = np.zeros([train_batch_size, depth, height, width, 3])
 train_batch_label = np.zeros([train_batch_size, 51])
 test_batch_image = np.zeros([test_batch_size, depth, height, width, 3])

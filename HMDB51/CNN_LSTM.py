@@ -172,7 +172,7 @@ def batch_norm(input, name, train, decay = 0.9):
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.tanh, reuse=None):
+               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
@@ -307,7 +307,7 @@ drop2 = tf.nn.dropout(pool2, keep_prob)
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
 convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
 
@@ -333,7 +333,7 @@ session = tf.Session(config=config)
 sess = tf.Session()
 
 
-prestore('hmdb51_org', depth, height, width)
+# prestore('hmdb51_org', depth, height, width)
 
 train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
 sess.run(tf.global_variables_initializer())

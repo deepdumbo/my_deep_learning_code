@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import os
 import time
-from My_dataset_class import MyDataset
+from .My_dataset_class import MyDataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def dataset(PATH, batch_size, epoch_num):
@@ -121,7 +121,7 @@ def batch_norm(input, name, train, decay = 0.9):
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.tanh, reuse=None):
+               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
@@ -131,6 +131,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
         self._state_is_tuple = state_is_tuple
         self._activation = activation
         self._name = name
+
 
         self._reuse = reuse
 
@@ -151,9 +152,9 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             else:
                 c, h = tf.split(value=state, num_or_size_splits=2, axis=3)
 
-            inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters * 2
+            inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters
             out_channel = self._num_filters * 4
-            concat = tf.concat([inputs, h, c], axis=3)
+            concat = tf.concat([inputs, h], axis=3)
 
             concat = conv2d(input = concat, name = self._name, kernel_size = self._kernel_size[0], input_channel = inp_channel, output_channel = out_channel)
 
@@ -171,7 +172,11 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
             return new_h, new_state
 
-def convlstm_cell(input, name, num_filters, kernel_size, train, keep_prob = 1.0, pool = False, output_h = False):
+
+
+
+
+def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool = False):
     shape = input.get_shape().as_list() #[time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
@@ -181,21 +186,16 @@ def convlstm_cell(input, name, num_filters, kernel_size, train, keep_prob = 1.0,
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
 
-    if output_h:
-        if pool:
-            output = max_pooling_2d(input=state[1], height=2, width=2)
-            return output
-        else:
-            return state[1]
-    else:
-        bn = batch_norm(input=tf.transpose(output, [1, 0, 2, 3, 4]), name=name, train=train)
-        output = tf.transpose(bn, [1, 0, 2, 3, 4])
-        if pool:
-            output = max_pooling_3d(input=output, depth=1, height=2, width=2)
-        return output
+
+    bn = batch_norm(input = tf.transpose(output, [1, 0, 2, 3, 4]), name = name, train = train)
+    output = tf.transpose(bn, [1, 0, 2, 3, 4])
+    if pool:
+        output = max_pooling_3d(input = output, depth = 1, height = 2, width = 2)
+
+    return output
 
 
-epoch_num = 100
+epoch_num = 200
 batch_size = 48
 
 depth = 40
@@ -276,6 +276,7 @@ for epoch in range(epoch_num):
         data, label = DATA.test_get_next()
         if len(data) == batch_size:
             num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
+            test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
 
