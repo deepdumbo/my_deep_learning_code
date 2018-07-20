@@ -299,7 +299,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_num, test_iterator, test_num = dataset('prestored', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2)
+train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2, one_hot=False)
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
@@ -310,6 +310,8 @@ test_next_batch = test_iterator.get_next()
 data = sess.run(train_next_batch)
 print(data)
 
+data = sess.run(test_next_batch)
+print(data)
 # lr = 1e-3
 # f = open('CNN_LSTM_res.txt', 'a')
 # for epoch in range(epoch_num):
