@@ -6,32 +6,26 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 class MyDataset(object):
-    def __init__(self, PATH, batch_size):
+    def __init__(self, PATH, batch_size, proportion):
         self.batch_size = batch_size
         self.train_get_next_cnt = 0
         self.test_get_next_cnt = 0
 
-        self.train_data = []
-        self.train_label = []
-        self.test_data = []
-        self.test_label = []
+        self.train = []
+        self.test = []
 
-        train_data_list = os.listdir(PATH + '/numpy/train')
-        self.train_num = len(train_data_list)
-        for i in range(self.train_num):
-            self.train_data.append(PATH + '/numpy/train/' + train_data_list[i] + '/data.npy')
-            self.train_label.append(np.load(PATH + '/numpy/train/' + train_data_list[i] + '/label.npy'))
+        data_list = os.listdir(PATH)
+        for data_name in data_list:
+            if np.random.rand() < proportion:
+                self.test.append(PATH + '/' + data_name)
+            else:
+                self.train.append(PATH + '/' + data_name)
 
-        test_data_list = os.listdir(PATH + '/numpy/test')
-        self.test_num = len(test_data_list)
-        for i in range(self.test_num):
-            self.test_data.append(PATH + '/numpy/test/' + test_data_list[i] + '/data.npy')
-            self.test_label.append(np.load(PATH + '/numpy/test/' + test_data_list[i] + '/label.npy'))
+        self.train_num = len(self.train)
+        self.test_num = len(self.test)
 
-        self.train_data = np.array(self.train_data)
-        self.train_label = np.array(self.train_label)
-        self.test_data = np.array(self.test_data)
-        self.test_label = np.array(self.test_label)
+        self.train = np.array(self.train)
+        self.test = np.array(self.test)
         self.shuffle()
 
         print(self.train_num, self.test_num)
@@ -39,22 +33,15 @@ class MyDataset(object):
     def shuffle(self):
         seed = np.random.randint(10000)
         np.random.seed(seed)
-        np.random.shuffle(self.train_data)
+        np.random.shuffle(self.train)
         np.random.seed(seed)
-        np.random.shuffle(self.train_label)
-
-        seed = np.random.randint(10000)
-        np.random.seed(seed)
-        np.random.shuffle(self.test_data)
-        np.random.seed(seed)
-        np.random.shuffle(self.test_label)
+        np.random.shuffle(self.train)
 
     def train_get_next(self):
         if self.train_get_next_cnt + self.batch_size > self.train_num:
             self.train_get_next_cnt = 0
             self.shuffle()
-        data = self.load_prestored_data(self.train_data[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size])
-        label = self.train_label[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size]
+        data, label = self.load_prestored_data(self.train[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size])
         self.train_get_next_cnt += self.batch_size
         return data, label
 
@@ -62,16 +49,18 @@ class MyDataset(object):
         if self.test_get_next_cnt + self.batch_size > self.test_num:
             self.test_get_next_cnt = 0
             self.shuffle()
-        data = self.load_prestored_data(self.test_data[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
-        label = self.test_label[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size]
+        data, label = self.load_prestored_data(self.test[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
         self.test_get_next_cnt += self.batch_size
         return data, label
 
     def load_prestored_data(self, PATH):
         batch_size = len(PATH)
         data = []
+        label = []
 
         for i in range(batch_size):
-            data.append(np.load(PATH[i]))
+            tmp = np.load(PATH[i])
+            data.append(tmp[0])
+            label.append(tmp[1])
 
-        return np.array(data)
+        return np.array(data), np.array(label)
