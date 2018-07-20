@@ -26,24 +26,20 @@ def dataset(PATH, batch_size, epoch_num):
     test_data = []
     test_label = []
 
-    CLASS = os.listdir(PATH + '/image/train')
-    CLASS_NUM = len(CLASS)
+    train_data_list = os.listdir(PATH + '/numpy/train')
+    train_num = len(train_data_list)
 
-    for i in range(CLASS_NUM):
-        data_list = os.listdir(PATH + '/image/train/' + CLASS[i])
-        for data_name in data_list:
-            train_data.append(PATH + '/image/train/' + CLASS[i] + '/' + data_name)
-            label = i
-            train_label.append(label)
+    for i in range(train_num):
+        train_data.append(PATH + '/numpy/train/' + train_data_list[i] + '/data.npy')
+        train_label.append(np.load(PATH + '/numpy/train/' + train_data_list[i] + '/label.npy'))
 
-        data_list = os.listdir(PATH + '/image/test/' + CLASS[i])
-        for data_name in data_list:
-            test_data.append(PATH + '/image/test/' + CLASS[i] + '/' + data_name)
-            label = i
-            test_label.append(label)
+    test_data_list = os.listdir(PATH + '/numpy/test')
+    test_num = len(test_data_list)
 
-    train_num = len(train_data)
-    test_num = len(test_data)
+    for i in range(test_num):
+        test_data.append(PATH + '/numpy/test/' + test_data_list[i] + '/data.npy')
+        test_label.append(np.load(PATH + '/numpy/test/' + test_data_list[i] + '/label.npy'))
+
     print(train_num, test_num)
 
     train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_label))
@@ -58,17 +54,12 @@ def dataset(PATH, batch_size, epoch_num):
 
 def load_prestored_data(PATH, depth, height, width, channel = 3):
     batch_size = len(PATH)
-    data = np.zeros([batch_size, depth, height, width, channel])
+    data = []
 
     for i in range(batch_size):
-        img_list = os.listdir(PATH[i])
-        for j in range(depth):
-            path = PATH[i].decode() + '/' + img_list[j].decode()
-            img = cv2.imread(path)
-            img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
-            data[i, j, :, :, :] = img[:, :, :]
+        data.append(np.load(PATH))
 
-    return data
+    return np.array(data)
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
@@ -213,8 +204,7 @@ height = 32
 width = 40
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
-y_ = tf.placeholder("int32", shape = [batch_size])
-y = tf.cast(tf.one_hot(y_, 51, 1, 0), 'float')
+y = tf.placeholder("float", shape = [batch_size, 51])
 sequence_length = tf.placeholder('int32', shape = [batch_size])
 BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
