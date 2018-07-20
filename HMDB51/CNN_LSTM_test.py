@@ -273,6 +273,7 @@ for epoch in range(epoch_num):
             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y_: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             print(time.time() - t)
             train_correct += num
+
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
     f.write('epoch:%d ' % epoch + '\n')
