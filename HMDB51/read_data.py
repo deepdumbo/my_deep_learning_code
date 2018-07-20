@@ -10,7 +10,6 @@ def read_data(rate = 0.8):
     height = 32
     width = 40
 
-
     train_data = np.zeros([5072, depth, height, width, 3])
     train_label = np.zeros([5072, 51])
     test_data = np.zeros([1302, depth, height, width, 3])
@@ -27,37 +26,58 @@ def read_data(rate = 0.8):
         num = len(path_video)
         print(action, num)
         for video in path_video:
+            data = np.zeros([depth, height, width, 3])
+            label = np.zeros([51])
+
             for i in range(depth):
                 img = cv2.imread(PATH + '/train/' + action + '/' + video + '/' + str(i) + '.jpg')
                 img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
                 #print np.shape(img)
                 #cv2.imshow('show', img)
                 #cv2.waitKey(300)
-                train_data[batch_train_num, i, :, :, :] = img[:, :, :] # gray image
+                print(type(img))
+                data[i, :, :, :] = img[:, :, :]
+            label[action_num] = 1
 
-            train_label[batch_train_num, action_num] = 1  # one hot
+            path_save = 'data/numpy/train/' + str(batch_train_num)
+            if not os.path.exists(path_save):
+                os.makedirs(path_save)
+            np.save('data/numpy/train/' + str(batch_train_num) + '/data' + '.npy', data)
+            np.save('data/numpy/train/' + str(batch_train_num) + '/label' + '.npy', label)
+
+            train_data[batch_train_num, :, :, :, :] = data[:, :, :, :]
+            train_label[batch_train_num, :] = label[:]  # one hot
             batch_train_num = batch_train_num + 1
 
         path_video = os.listdir(PATH + '/test/' + action)
         num = len(path_video)
         print(action, num)
         for video in path_video:
+            data = np.zeros([depth, height, width, 3])
+            label = np.zeros([51])
+
             for i in range(depth):
                 img = cv2.imread(PATH + '/test/' + action + '/' + video + '/' + str(i) + '.jpg')
                 img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
                 # print np.shape(img)
                 # cv2.imshow('show', img)
                 # cv2.waitKey(300)
-                test_data[batch_test_num, i, :, :, :] = img[:, :, :]  # gray image
+                data[i, :, :, :] = img[:, :, :]
+            label[action_num] = 1
 
-            test_label[batch_test_num, action_num] = 1  # one hot
+            path_save = 'data/numpy/test/' + str(batch_test_num)
+            if not os.path.exists(path_save):
+                os.makedirs(path_save)
+            np.save('data/numpy/test/' + str(batch_test_num) + '/data' + '.npy', data)
+            np.save('data/numpy/test/' + str(batch_test_num) + '/label' + '.npy', label)
+
+            test_data[batch_test_num, :, :, :, :] = data[:, :, :, :]  # gray image
+            test_label[batch_test_num, :] = label[:]  # one hot
             batch_test_num = batch_test_num + 1
 
         action_num = action_num + 1
     print('train num:', batch_train_num)
     print('test num:', batch_test_num)
-
-
 
     return train_data, train_label, test_data, test_label
 
