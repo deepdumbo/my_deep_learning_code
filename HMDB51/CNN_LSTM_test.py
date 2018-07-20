@@ -6,7 +6,7 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
-def dataset(PATH, batch_size, epoch_num, proportion, one_hot = True):
+def dataset(PATH, batch_size, epoch_num, one_hot = True):
     """
     Generate the tf.data.dataset. This function return the iterator and sample size. iterator need to be initial as
         sess.run(iterator.initializer)
@@ -16,7 +16,7 @@ def dataset(PATH, batch_size, epoch_num, proportion, one_hot = True):
         PATH: 
         batch_size: 
         epoch_num:
-        proportion: The proportion of test data.
+        one_hot:
 
     Returns: [train_iterator, train_num, test_iterator, test_num]
 
@@ -59,24 +59,23 @@ def dataset(PATH, batch_size, epoch_num, proportion, one_hot = True):
     train_iterator = train_dataset.make_initializable_iterator()
 
     test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_label))
-    test_dataset = test_dataset.shuffle(buffer_size=test_num*2).batch(batch_size).repeat(epoch_num)
+    test_dataset = test_dataset.shuffle(buffer_size=test_num*10).batch(batch_size).repeat(epoch_num)
     test_iterator = test_dataset.make_initializable_iterator()
 
     return train_iterator, train_num, test_iterator, test_num
 
-def load_prestored_data(PATH):
-    data = []
-    label = []
-    # video_length = []
+def load_prestored_data(PATH, depth, height, width, channel = 3):
+    batch_size = len(PATH)
+    data = np.zeros([batch_size, depth, height, width, channel])
 
-    for data_path in PATH:
-        prestored_data = np.load(data_path.decode())
-        data.append(prestored_data[0])
-        label.append(prestored_data[1])
-        # video_length.append(prestored_data[2])
+    for i in range(batch_size):
+        img_list = os.listdir(PATH[i])
+        for j in range(depth):
+            img = cv2.imread(PATH[i] + '/' + img_list[j])
+            img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
+            data[i, j, :, :, :] = img[:, :, :]
 
-    # return data, label, video_length
-    return data, label
+    return data
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
@@ -189,15 +188,13 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
             return new_h, new_state
 
-def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train, keep_prob = 1.0, pool = False, output_h = False):
+def convlstm_cell(input, name, num_filters, kernel_size, train, keep_prob = 1.0, pool = False, output_h = False):
     shape = input.get_shape().as_list() #[time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(shape[1], dtype=tf.float32)
 
     output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, time_major=True)
-    #output, state = tf.nn.dynamic_rnn(cell, inputs=input, sequence_length=sequence_length, initial_state=init_state, time_major=True)
-
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
 
@@ -229,36 +226,6 @@ BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
 learning_rate = tf.placeholder('float', shape = [])
 
-# x_ = tf.reshape(x, [-1, 5, height, width, 3])
-print(x.get_shape())
-
-# conv1 = conv3d(input = x_, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, padding='VALID')
-# conv1_ = conv3d(input = conv1, name = 'conv1_', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 64)
-# batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
-# act1 = tf.nn.relu(batch1)
-# pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
-# drop1 = tf.nn.dropout(pool1, keep_prob)
-# print(pool1.get_shape())
-#
-# conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, padding='VALID')
-# conv2_ = conv3d(input = conv2, name = 'conv2_', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 128)
-# batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
-# act2 = tf.nn.relu(batch2)
-# pool2 = max_pooling_3d(input = act2, depth = 1, width = 2, height = 2)
-# drop2 = tf.nn.dropout(pool2, keep_prob)
-# print(pool2.get_shape())
-#
-# reshape = tf.reshape(drop2, [batch_size, int(depth/5), 8, 10, 128])
-
-# conv3 = conv3d(input = reshape, name = 'conv3', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256)
-# conv3_ = conv3d(input = conv3, name = 'conv3_', depth = 3, kernel_size = 3, input_channel = 256, output_channel = 256)
-# batch3 = batch_norm(input = conv3_, name = 'batch3', train = BN_train)
-# act3 = tf.nn.relu(batch3)
-# drop3 = tf.nn.dropout(act3, keep_prob)
-# print(drop3.get_shape())
-
-# lstm_input = tf.transpose(reshape, [1, 0, 2, 3, 4]) # to fit the time_major
-
 conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1)
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
@@ -274,9 +241,9 @@ drop2 = tf.nn.dropout(pool2, keep_prob)
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', sequence_length=sequence_length, num_filters = 128, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', sequence_length=sequence_length, num_filters = 256, kernel_size = [3, 3], train=BN_train, keep_prob=keep_prob)
+convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', num_filters = 128, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
+convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train, pool = True)
+convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
 
 lstm_output = convlstm3[-1, :, :, :, :]
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
@@ -299,7 +266,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num, proportion=0.2, one_hot=False)
+train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num, one_hot=True)
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
@@ -307,46 +274,33 @@ sess.run(test_iterator.initializer)
 train_next_batch = train_iterator.get_next()
 test_next_batch = test_iterator.get_next()
 
-data = sess.run(train_next_batch)
-print(data)
+lr = 1e-3
+f = open('CNN_LSTM_res.txt', 'a')
+for epoch in range(epoch_num):
+    train_correct = 0
+    for i in range(int(train_num / batch_size)):
+        print(i)
+        data, label = sess.run(train_next_batch)
+        if len(data) == batch_size:
+            data = load_prestored_data(data, depth, height, width)
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
+            train_correct += num
+    print('epoch:%d ' % epoch)
+    print('train accuracy: %f ' % (train_correct / train_num))
+    f.write('epoch:%d ' % epoch + '\n')
+    f.write('train accuracy: %f ' % (train_correct / train_num) + '\n')
 
-data = sess.run(test_next_batch)
-print(data)
-# lr = 1e-3
-# f = open('CNN_LSTM_res.txt', 'a')
-# for epoch in range(epoch_num):
-#     train_correct = 0
-#     for i in range(int(train_num / batch_size)):
-#         # print(i)
-#         data = sess.run(train_next_batch)
-#         if len(data) == batch_size:
-#             # data, label, length = load_prestored_data(data)
-#             # length = (np.array(length) / 5).astype(int)
-#             # print(np.shape(data), np.shape(label))
-#             # print(label)
-#             data, label = load_prestored_data(data)
-#             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
-#             train_correct += num
-#     print('epoch:%d ' % epoch)
-#     print('train accuracy: %f ' % (train_correct / train_num))
-#     f.write('epoch:%d ' % epoch + '\n')
-#     f.write('train accuracy: %f ' % (train_correct / train_num))
-#
-#     test_correct = 0
-#     for i in range(int(test_num / batch_size)):
-#         data = sess.run(test_next_batch)
-#         if len(data) == batch_size:
-#             # data, label, length = load_prestored_data(data)
-#             # print(length)
-#             # length = (np.array(length) / 5).astype(int)
-#             # print(length)
-#             data, label = load_prestored_data(data)
-#             num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
-#             test_correct += num
-#     print('test accuracy: %f ' % (test_correct / test_num))
-#     f.write('test accuracy: %f ' % (test_correct / test_num))
-#
-#     if test_correct / test_num > 0.35:
-#         lr = 1e-4
-#     else:
-#         lr = 1e-3
+    test_correct = 0
+    for i in range(int(test_num / batch_size)):
+        data, label = sess.run(test_next_batch)
+        if len(data) == batch_size:
+            data = load_prestored_data(data, depth, height, width)
+            num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
+            test_correct += num
+    print('test accuracy: %f ' % (test_correct / test_num))
+    f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
+
+    if test_correct / test_num > 0.35:
+        lr = 1e-4
+    else:
+        lr = 1e-3
