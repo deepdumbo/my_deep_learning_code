@@ -63,7 +63,8 @@ def load_prestored_data(PATH, depth, height, width, channel = 3):
     for i in range(batch_size):
         img_list = os.listdir(PATH[i])
         for j in range(depth):
-            img = cv2.imread(PATH[i] + '/' + img_list[j])
+            path = PATH[i].decode() + '/' + img_list[j].decode()
+            img = cv2.imread(path)
             img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
             data[i, j, :, :, :] = img[:, :, :]
 
@@ -205,15 +206,15 @@ def convlstm_cell(input, name, num_filters, kernel_size, train, keep_prob = 1.0,
 
 
 epoch_num = 100
-batch_size = 16
+batch_size = 48
 
 depth = 40
 height = 32
 width = 40
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
-y = tf.placeholder("float", shape = [batch_size])
-y = tf.one_hot(y, 51, 1, 0)
+y_ = tf.placeholder("int32", shape = [batch_size])
+y = tf.cast(tf.one_hot(y_, 51, 1, 0), 'float')
 sequence_length = tf.placeholder('int32', shape = [batch_size])
 BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
@@ -275,12 +276,8 @@ for epoch in range(epoch_num):
         print(i)
         data, label = sess.run(train_next_batch)
         if len(data) == batch_size:
-            t = time.time()
             data = load_prestored_data(data, depth, height, width)
-            print(time.time() - t)
-            t = time.time()
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
-            print(time.time() - t)
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y_: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
             train_correct += num
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
@@ -292,7 +289,7 @@ for epoch in range(epoch_num):
         data, label = sess.run(test_next_batch)
         if len(data) == batch_size:
             data = load_prestored_data(data, depth, height, width)
-            num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
+            num = sess.run(correct_num, feed_dict={x: data, y_: label, BN_train: False, keep_prob: 1.0})
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
