@@ -41,14 +41,13 @@ def dataset(PATH, batch_size, epoch_num):
         test_label.append(np.load(PATH + '/numpy/test/' + test_data_list[i] + '/label.npy'))
 
     print(train_num, test_num)
-
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_label))
+    test_dataset = tf.data.Dataset.from_tensor_slices((test_data, np.array(test_label)))
+    test_dataset = test_dataset.shuffle(buffer_size=test_num*10).batch(batch_size).repeat(epoch_num)
+    test_iterator = test_dataset.make_initializable_iterator()
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_data, np.array(train_label)))
     train_dataset = train_dataset.shuffle(buffer_size=train_num*10).batch(batch_size).repeat(epoch_num)
     train_iterator = train_dataset.make_initializable_iterator()
 
-    test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_label))
-    test_dataset = test_dataset.shuffle(buffer_size=test_num*10).batch(batch_size).repeat(epoch_num)
-    test_iterator = test_dataset.make_initializable_iterator()
 
     return train_iterator, train_num, test_iterator, test_num
 
@@ -57,7 +56,7 @@ def load_prestored_data(PATH, depth, height, width, channel = 3):
     data = []
 
     for i in range(batch_size):
-        data.append(np.load(PATH))
+        data.append(np.load(PATH[i].decode()))
 
     return np.array(data)
 
@@ -261,15 +260,10 @@ f = open('CNN_LSTM_res.txt', 'a')
 for epoch in range(epoch_num):
     train_correct = 0
     for i in range(int(train_num / batch_size)):
-        print(i)
+        #print(i)
         data, label = DATA.train_get_next()
         if len(data) == batch_size:
-            t = time.time()
-            data = load_prestored_data(data, depth, height, width)
-            print(time.time() - t)
-            t = time.time()
             num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
-            print(time.time() - t)
             train_correct += num
 
     print('epoch:%d ' % epoch)
@@ -281,9 +275,7 @@ for epoch in range(epoch_num):
     for i in range(int(DATA.test_num / batch_size)):
         data, label = DATA.test_get_next()
         if len(data) == batch_size:
-            data = load_prestored_data(data, depth, height, width)
             num = sess.run(correct_num, feed_dict={x: data, y: label, BN_train: False, keep_prob: 1.0})
-            test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
 

@@ -35,7 +35,7 @@ def read_data(rate = 0.8):
                 #print np.shape(img)
                 #cv2.imshow('show', img)
                 #cv2.waitKey(300)
-                print(type(img))
+                #print(type(img))
                 data[i, :, :, :] = img[:, :, :]
             label = action_num
 

@@ -32,6 +32,7 @@ class MyDataset(object):
         self.train_label = np.array(self.train_label)
         self.test_data = np.array(self.test_data)
         self.test_label = np.array(self.test_label)
+        self.shuffle()
 
         print(self.train_num, self.test_num)
 
@@ -54,6 +55,7 @@ class MyDataset(object):
             self.shuffle()
         data = self.load_prestored_data(self.train_data[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size])
         label = self.train_label[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size]
+        self.train_get_next_cnt += self.batch_size
         return data, label
 
     def test_get_next(self):
@@ -62,6 +64,7 @@ class MyDataset(object):
             self.shuffle()
         data = self.load_prestored_data(self.test_data[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
         label = self.test_label[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size]
+        self.test_get_next_cnt += self.batch_size
         return data, label
 
     def load_prestored_data(self, PATH):
@@ -69,6 +72,6 @@ class MyDataset(object):
         data = []
 
         for i in range(batch_size):
-            data.append(np.load(PATH))
+            data.append(np.load(PATH[i]))
 
         return np.array(data)
