@@ -6,7 +6,7 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
-def dataset(PATH, batch_size, epoch_num, one_hot = True):
+def dataset(PATH, batch_size, epoch_num):
     """
     Generate the tf.data.dataset. This function return the iterator and sample size. iterator need to be initial as
         sess.run(iterator.initializer)
@@ -33,21 +33,13 @@ def dataset(PATH, batch_size, epoch_num, one_hot = True):
         data_list = os.listdir(PATH + '/image/train/' + CLASS[i])
         for data_name in data_list:
             train_data.append(PATH + '/image/train/' + CLASS[i] + '/' + data_name)
-            if one_hot:
-                label = np.zeros([CLASS_NUM])
-                label[i] = 1
-            else:
-                label = i
+            label = i
             train_label.append(label)
 
         data_list = os.listdir(PATH + '/image/test/' + CLASS[i])
         for data_name in data_list:
             test_data.append(PATH + '/image/test/' + CLASS[i] + '/' + data_name)
-            if one_hot:
-                label = np.zeros([CLASS_NUM])
-                label[i] = 1
-            else:
-                label = i
+            label = i
             test_label.append(label)
 
     train_num = len(train_data)
@@ -220,7 +212,8 @@ height = 32
 width = 40
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
-y = tf.placeholder("float", shape = [batch_size, 51])
+y = tf.placeholder("float", shape = [batch_size])
+y = tf.one_hot(y, 51, 1, 0)
 sequence_length = tf.placeholder('int32', shape = [batch_size])
 BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
@@ -266,7 +259,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num, one_hot=True)
+train_iterator, train_num, test_iterator, test_num = dataset('data', batch_size=batch_size, epoch_num=epoch_num)
 sess.run(tf.global_variables_initializer())
 sess.run(train_iterator.initializer)
 sess.run(test_iterator.initializer)
