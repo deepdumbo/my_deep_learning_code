@@ -50,6 +50,7 @@ def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
                     length_count += 1
                     if length_count == depth:
                         np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label]))
+                        break
                 else:
                     break
             video_length = length_count
@@ -360,7 +361,7 @@ for epoch in range(epoch_num):
             train_correct += num
     print('epoch:%d ' % epoch)
     print('train accuracy: %f ' % (train_correct / train_num))
-    f.write('epoch:%d ' % epoch)
+    f.write('epoch:%d ' % epoch + '\n')
     f.write('train accuracy: %f ' % (train_correct / train_num))
 
     test_correct = 0
