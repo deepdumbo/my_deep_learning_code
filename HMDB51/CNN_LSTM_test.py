@@ -189,7 +189,7 @@ class my_BasicConvLSTMCell(object):
         self.W = tf.get_variable(name=self.name + '_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel, self.output_channel])
         self.b = tf.get_variable(name=self.name + '_bias', shape=[self.output_channel])
 
-    def __call__(self, input, state):
+    def __call__(self, input, state, train, keep_prob, time_step):
         c, h = state
         concat = tf.concat([input, h], axis=3)
         conv = tf.add(tf.nn.conv2d(concat, self.W, strides=[1, 1, 1, 1], padding='SAME'), self.b)
@@ -197,9 +197,10 @@ class my_BasicConvLSTMCell(object):
         i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
 
         new_c = (c * tf.sigmoid(f + self.forget_bias) + tf.sigmoid(i) * self.activation(j))
+        # new_c = batch_norm(new_c, name=self.name + num, train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
-        new_state = (new_c, new_h)
+        new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
         return new_h, new_state
 
 
@@ -214,7 +215,7 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = []
     input = tf.unstack(input, axis=0)
     for i in range(len(input)):
-        output_, state = cell(input[i], state)
+        output_, state = cell(input[i], state, train, keep_prob, '_step'+str(i))
         output.append(output_)
     output = tf.stack(output, axis=0)
 
@@ -291,6 +292,9 @@ train_num = DATA.train_num
 test_num = DATA.test_num
 
 sess.run(tf.global_variables_initializer())
+variable_name = [v.name for v in tf.trainable_variables()]
+for _ in variable_name:
+    print(_)
 
 lr = 1e-3
 f = open('CNN_LSTM_res.txt', 'a')
