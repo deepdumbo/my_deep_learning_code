@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import os
 import time
-from .My_dataset_class import MyDataset
+from My_dataset_class import MyDataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def dataset(PATH, batch_size, epoch_num):
@@ -249,7 +249,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-DATA = MyDataset('data', batch_size)
+DATA = MyDataset('prestored', batch_size, 0.2)
 train_num = DATA.train_num
 test_num = DATA.test_num
 
