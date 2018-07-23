@@ -120,7 +120,7 @@ def batch_norm(input, name, train, decay = 0.9):
     return result
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
-    def __init__(self, shape, num_filters, kernel_size, name, forget_bias=1.0,
+    def __init__(self, shape, num_filters, kernel_size, name, train, forget_bias=1.0,
                input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
         self._shape = shape
         self._num_filters = num_filters
@@ -131,6 +131,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
         self._state_is_tuple = state_is_tuple
         self._activation = activation
         self._name = name
+        self.train = train
 
 
         self._reuse = reuse
@@ -161,6 +162,8 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             i, j, f, o = tf.split(value=concat, num_or_size_splits=4, axis=3)
 
             new_c = (c * tf.sigmoid(f + self._forget_bias) + tf.sigmoid(i) * self._activation(j))
+            new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
+
             new_h = self._activation(new_c) * tf.sigmoid(o)
 
 
@@ -178,7 +181,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
 def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool = False):
     shape = input.get_shape().as_list() #[time, batch, height, width, channel]
-    cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name)
+    cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name, train=train)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(shape[1], dtype=tf.float32)
 
@@ -187,8 +190,7 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool 
     # state is a tuple
 
 
-    bn = batch_norm(input = tf.transpose(output, [1, 0, 2, 3, 4]), name = name, train = train)
-    output = tf.transpose(bn, [1, 0, 2, 3, 4])
+    output = batch_norm(output, name = name, train = train)
     if pool:
         output = max_pooling_3d(input = output, depth = 1, height = 2, width = 2)
 
@@ -263,7 +265,7 @@ for epoch in range(epoch_num):
         #print(i)
         data, label = DATA.train_get_next()
         if len(data) == batch_size:
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.5, learning_rate: lr})
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, BN_train: True, keep_prob: 0.7, learning_rate: lr})
             train_correct += num
 
     print('epoch:%d ' % epoch)
