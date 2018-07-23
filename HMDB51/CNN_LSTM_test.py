@@ -197,7 +197,7 @@ class my_BasicConvLSTMCell(object):
         i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
 
         new_c = (c * tf.sigmoid(f + self.forget_bias) + tf.sigmoid(i) * self.activation(j))
-        # new_c = batch_norm(new_c, name=self.name + num, train=train)
+        new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
         new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
@@ -215,7 +215,7 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = []
     input = tf.unstack(input, axis=0)
     for i in range(len(input)):
-        output_, state = cell(input[i], state, train, keep_prob, '_step'+str(i))
+        output_, state = cell(input=input[i], state=state, train=train, keep_prob=keep_prob, time_step=i)
         output.append(output_)
     output = tf.stack(output, axis=0)
 
