@@ -177,12 +177,53 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool 
 
     return output
 
-def my_convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool=False):
-    input = tf.transpose(input, [1, 0, 2, 3, 4])
+class my_BasicConvLSTMCell(object):
+    def __init__(self, name, kernel_size, input_channel, output_channel, activation=tf.nn.softsign, forget_bias=1.0):
+        self.name = name
+        self.kernel_size = kernel_size
+        self.input_channel = input_channel + output_channel
+        self.output_channel = output_channel * 4
+        self.activation = activation
+        self.forget_bias = forget_bias
+
+        self.W = tf.get_variable(name=self.name + '_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel, self.output_channel])
+        self.b = tf.get_variable(name=self.name + '_bias', shape=[self.output_channel])
+
+    def __call__(self, input, state):
+        c, h = state
+        concat = tf.concat([input, h], axis=3)
+        conv = tf.add(tf.nn.conv2d(concat, self.W, strides=[1, 1, 1, 1], padding='SAME'), self.b)
+
+        i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
+
+        new_c = (c * tf.sigmoid(f + self.forget_bias) + tf.sigmoid(i) * self.activation(j))
+        new_h = self.activation(new_c) * tf.sigmoid(o)
+
+        new_state = (new_c, new_h)
+        return new_h, new_state
+
+
+def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False):
     shape = input.get_shape().as_list()
-    cell = BasicConvLSTMCell(shape=[shape[2], shape[3]], num_filters=num_filters, kernel_size=kernel_size, name=name,
-                             train=train)
-    state = tf.constant(np.zeros([2]))
+    cell = my_BasicConvLSTMCell(name=name, kernel_size=kernel_size, input_channel=shape[-1], output_channel=output_channel)
+
+    # zero initial state
+    state = (np.zeros([shape[1], shape[2], shape[3], output_channel]),
+             np.zeros([shape[1], shape[2], shape[3], output_channel]))
+
+    output = []
+    input = tf.unstack(input, axis=0)
+    for i in range(len(input)):
+        output_, state = cell(input[i], state)
+        output.append(output_)
+    output = tf.stack(output, axis=0)
+
+    output = batch_norm(output, name=name, train=train)
+    if pool:
+        output = max_pooling_3d(input=output, depth=1, height=2, width=2)
+
+    return output
+
 
 
 
@@ -215,9 +256,14 @@ drop2 = tf.nn.dropout(pool2, keep_prob)
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
 
 print(lstm_input.get_shape())
-convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', num_filters = 128, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
-convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train, pool = True)
-convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
+# convlstm1 = convlstm_cell(input = lstm_input, name = 'convlstm1', num_filters = 128, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
+# convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train, pool = True)
+# convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
+
+convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
+convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
+convlstm3 = my_convlstm(input = convlstm2, name = 'convlstm3', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
+
 
 lstm_output = convlstm3[-1, :, :, :, :]
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
