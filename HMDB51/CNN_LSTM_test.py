@@ -181,23 +181,26 @@ class my_BasicConvLSTMCell(object):
     def __init__(self, name, kernel_size, input_channel, output_channel, activation=tf.nn.softsign, forget_bias=1.0):
         self.name = name
         self.kernel_size = kernel_size
-        self.input_channel = input_channel + output_channel
-        self.output_channel = output_channel * 4
+        self.input_channel = input_channel
+        self.output_channel = output_channel
         self.activation = activation
         self.forget_bias = forget_bias
 
-        self.W = tf.get_variable(name=self.name + '_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel, self.output_channel])
-        self.b = tf.get_variable(name=self.name + '_bias', shape=[self.output_channel])
-
     def __call__(self, input, state, train, keep_prob, time_step):
         c, h = state
-        concat = tf.concat([input, h], axis=3)
-        conv = tf.add(tf.nn.conv2d(concat, self.W, strides=[1, 1, 1, 1], padding='SAME'), self.b)
+        h = tf.cast(h, 'float32')
+        # concat = tf.concat([input, h], axis=3)
+        with tf.variable_scope("convlstm_cell", reuse=tf.AUTO_REUSE):
+            conv_x = conv2d(input, self.name + '_x_conv', self.kernel_size, self.input_channel, self.output_channel*4)
+            conv_h = conv2d(h, self.name + '_h_conv', self.kernel_size, self.output_channel, self.output_channel*4)
 
-        i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
+        conv_x = batch_norm(conv_x, self.name + '_x_step' + str(time_step), train)
+        conv_h = batch_norm(conv_h, self.name + '_h_step' + str(time_step), train)
+
+        i, j, f, o = tf.split(value=conv_x+conv_h, num_or_size_splits=4, axis=3)
 
         new_c = (c * tf.sigmoid(f + self.forget_bias) + tf.sigmoid(i) * self.activation(j))
-        new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
+        # new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
         new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
