@@ -129,12 +129,12 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
         self._forget_bias = forget_bias
         self._activation = activation
         self._name = name
+
         self.train = train
 
     @property
     def state_size(self):
-        return (tf.contrib.rnn.LSTMStateTuple(self._size, self._size)
-                if self._state_is_tuple else 2 * self._num_units)
+        return tf.contrib.rnn.LSTMStateTuple(self._size, self._size)
 
     @property
     def output_size(self):
@@ -149,7 +149,8 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             out_channel = self._num_filters * 4
             concat = tf.concat([inputs, h], axis=3)
 
-            concat = conv2d(input=concat, name=self._name, kernel_size=self._kernel_size[0], input_channel=inp_channel, output_channel=out_channel)
+            concat = conv2d(input = concat, name = self._name, kernel_size = self._kernel_size[0], input_channel = inp_channel, output_channel = out_channel)
+
             i, j, f, o = tf.split(value=concat, num_or_size_splits=4, axis=3)
 
             new_c = (c * tf.sigmoid(f + self._forget_bias) + tf.sigmoid(i) * self._activation(j))
