@@ -120,21 +120,16 @@ def batch_norm(input, name, train, decay = 0.9):
     return result
 
 class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
-    def __init__(self, shape, num_filters, kernel_size, name, train, forget_bias=1.0,
-               input_size=None, state_is_tuple=True, activation=tf.nn.softsign, reuse=None):
+    def __init__(self, shape, num_filters, kernel_size, name, train, forget_bias=1.0, activation=tf.nn.softsign):
         self._shape = shape
         self._num_filters = num_filters
         self._kernel_size = kernel_size
         self._size = tf.TensorShape(shape+[self._num_filters])
 
         self._forget_bias = forget_bias
-        self._state_is_tuple = state_is_tuple
         self._activation = activation
         self._name = name
         self.train = train
-
-
-        self._reuse = reuse
 
     @property
     def state_size(self):
@@ -147,40 +142,22 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
     def __call__(self, inputs, state, scope=None):
         # we suppose inputs to be [time, batch_size, row, col, channel]
-        with tf.variable_scope(scope or "basic_convlstm_cell", reuse=self._reuse):
-            if self._state_is_tuple:
-                c, h = state
-            else:
-                c, h = tf.split(value=state, num_or_size_splits=2, axis=3)
+        with tf.variable_scope(scope or "basic_convlstm_cell"):
+            c, h = state
 
             inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters
             out_channel = self._num_filters * 4
             concat = tf.concat([inputs, h], axis=3)
 
-            concat = conv2d(input = concat, name = self._name, kernel_size = self._kernel_size[0], input_channel = inp_channel, output_channel = out_channel)
-
+            concat = conv2d(input=concat, name=self._name, kernel_size=self._kernel_size[0], input_channel=inp_channel, output_channel=out_channel)
             i, j, f, o = tf.split(value=concat, num_or_size_splits=4, axis=3)
-            i = batch_norm(i, name=self.name+'_i', train=self.train)
-            j = batch_norm(j, name=self.name+'_j', train=self.train)
-            f = batch_norm(f, name=self.name+'_f', train=self.train)
-            o = batch_norm(o, name=self.name+'_o', train=self.train)
 
             new_c = (c * tf.sigmoid(f + self._forget_bias) + tf.sigmoid(i) * self._activation(j))
-            # new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
-
+            new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
             new_h = self._activation(new_c) * tf.sigmoid(o)
 
-
-            if self._state_is_tuple:
-                new_state = tf.contrib.rnn.LSTMStateTuple(new_c, new_h)
-            else:
-                new_state = tf.concat([new_c, new_h], 3)
-
-
+            new_state = tf.contrib.rnn.LSTMStateTuple(new_c, new_h)
             return new_h, new_state
-
-
-
 
 
 def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool = False):
@@ -198,6 +175,11 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool 
         output = max_pooling_3d(input = output, depth = 1, height = 2, width = 2)
 
     return output
+
+def my_convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool=False):
+    input = tf.transpose(input, [1, 0, 2, 3, 4])
+    shape = input.get_shape().as_list()
+
 
 
 epoch_num = 200
