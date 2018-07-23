@@ -160,9 +160,13 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
             concat = conv2d(input = concat, name = self._name, kernel_size = self._kernel_size[0], input_channel = inp_channel, output_channel = out_channel)
 
             i, j, f, o = tf.split(value=concat, num_or_size_splits=4, axis=3)
+            i = batch_norm(i, name=self.name+'_i', train=self.train)
+            j = batch_norm(j, name=self.name+'_j', train=self.train)
+            f = batch_norm(f, name=self.name+'_f', train=self.train)
+            o = batch_norm(o, name=self.name+'_o', train=self.train)
 
             new_c = (c * tf.sigmoid(f + self._forget_bias) + tf.sigmoid(i) * self._activation(j))
-            new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
+            # new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
 
             new_h = self._activation(new_c) * tf.sigmoid(o)
 
@@ -188,7 +192,6 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool 
     output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, time_major=True)
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
-
 
     output = batch_norm(output, name = name, train = train)
     if pool:
