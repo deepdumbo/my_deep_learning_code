@@ -179,6 +179,9 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool 
 def my_convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, pool=False):
     input = tf.transpose(input, [1, 0, 2, 3, 4])
     shape = input.get_shape().as_list()
+    cell = BasicConvLSTMCell(shape=[shape[2], shape[3]], num_filters=num_filters, kernel_size=kernel_size, name=name,
+                             train=train)
+    state = tf.constant(np.zeros([2]))
 
 
 
