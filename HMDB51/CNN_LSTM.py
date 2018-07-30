@@ -252,8 +252,8 @@ epoch_num = 100
 batch_size = 16
 
 depth = 40
-height = 32
-width = 40
+height = 64
+width = 80
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])

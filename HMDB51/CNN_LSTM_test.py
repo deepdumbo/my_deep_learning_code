@@ -191,7 +191,6 @@ class my_BasicConvLSTMCell(object):
 
     def __call__(self, input, state, train, keep_prob, time_step):
         c, h = state
-        # h = tf.cast(h, 'float32')
         concat = tf.concat([input, h], axis=3)
         # with tf.variable_scope("convlstm_cell", reuse=tf.AUTO_REUSE):
         #     conv_x = conv2d(input, self.name + '_x_conv', self.kernel_size, self.input_channel, self.output_channel*4)
@@ -214,9 +213,8 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     cell = my_BasicConvLSTMCell(name=name, kernel_size=kernel_size, input_channel=shape[-1], output_channel=output_channel)
 
     # zero initial state
-    state = [np.zeros([shape[1], shape[2], shape[3], output_channel]),
-             np.zeros([shape[1], shape[2], shape[3], output_channel])]
-    # state = tf.cast(state, 'float32')
+    state = (np.zeros([shape[1], shape[2], shape[3], output_channel]),
+             np.zeros([shape[1], shape[2], shape[3], output_channel]))
 
     output = []
     input = tf.unstack(input, axis=0)
@@ -238,8 +236,8 @@ epoch_num = 200
 batch_size = 48
 
 depth = 40
-height = 32
-width = 40
+height = 64
+width = 80
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
@@ -248,13 +246,13 @@ BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
 learning_rate = tf.placeholder('float', shape = [])
 
-conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 128, depth_strides = 1)
+conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1)
 batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 
-conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 128, output_channel = 256, depth_strides = 1)
+conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, depth_strides = 1)
 batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input = act2, depth = 5, width = 2, height = 2)
@@ -267,9 +265,10 @@ print(lstm_input.get_shape())
 # convlstm2 = convlstm_cell(input = convlstm1, name = 'convlstm2', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train, pool = True)
 # convlstm3 = convlstm_cell(input = convlstm2, name = 'convlstm3', num_filters = 256, kernel_size = [3, 3], keep_prob = keep_prob, train = BN_train)
 
-convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
-convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
+convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
+convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
 convlstm3 = my_convlstm(input = convlstm2, name = 'convlstm3', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
+convlstm4 = my_convlstm(input = convlstm3, name = 'convlstm4', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
 
 
 lstm_output = convlstm3[-1, :, :, :, :]
