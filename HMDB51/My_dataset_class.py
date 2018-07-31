@@ -41,26 +41,28 @@ class MyDataset(object):
         if self.train_get_next_cnt + self.batch_size > self.train_num:
             self.train_get_next_cnt = 0
             self.shuffle()
-        data, label = self.load_prestored_data(self.train[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size])
+        data, label, length = self.load_prestored_data(self.train[self.train_get_next_cnt: self.train_get_next_cnt + self.batch_size])
         self.train_get_next_cnt += self.batch_size
-        return data, label
+        return data, label, length
 
     def test_get_next(self):
         if self.test_get_next_cnt + self.batch_size > self.test_num:
             self.test_get_next_cnt = 0
             self.shuffle()
-        data, label = self.load_prestored_data(self.test[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
+        data, label, length = self.load_prestored_data(self.test[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
         self.test_get_next_cnt += self.batch_size
-        return data, label
+        return data, label, length
 
     def load_prestored_data(self, PATH):
         batch_size = len(PATH)
         data = []
         label = []
+        length = []
 
         for i in range(batch_size):
             tmp = np.load(PATH[i])
             data.append(tmp[0])
             label.append(tmp[1])
+            length.append(tmp[2])
 
-        return np.array(data), np.array(label)
+        return np.array(data), np.array(label), (np.array(length) / 5).astype('int')

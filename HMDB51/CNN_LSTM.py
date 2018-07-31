@@ -49,14 +49,14 @@ def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
                     data[length_count, :, :, :] = frame[:, :, :]
                     length_count += 1
                     if length_count == depth:
-                        np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label]))
+                        # np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label]))
                         break
                 else:
                     break
             video_length = length_count
 
             # TODO it may need more readable name
-            # np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
+            np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
 
 
 def dataset(PATH, batch_size, epoch_num, proportion):
@@ -251,9 +251,11 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
 epoch_num = 100
 batch_size = 16
 
-depth = 40
-height = 64
-width = 80
+depth = 60
+height = 32
+width = 40
+
+prestore('hmdb51_org', depth, height, width)
 
 x = tf.placeholder("float", shape = [batch_size, depth, height, width, 3])
 y = tf.placeholder("float", shape = [batch_size, 51])
