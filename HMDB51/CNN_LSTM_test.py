@@ -248,19 +248,27 @@ BN_train = tf.placeholder('bool', shape = [])
 keep_prob = tf.placeholder("float", shape = [])
 learning_rate = tf.placeholder('float', shape = [])
 
-conv1 = conv3d(input = x, name = 'conv1', depth = 3, kernel_size = 3, input_channel = 3, output_channel = 64, depth_strides = 1)
-batch1 = batch_norm(input = conv1, name = 'batch1', train = BN_train)
+"""
+00100001000
+01110011100
+11111111111
+"""
+
+conv1 = conv3d(input=x, name='conv1', depth=3, kernel_size=3, input_channel=3, output_channel=64)
+conv1_ = conv3d(input=conv1, name='conv1_', depth=3, kernel_size=3, input_channel=3, output_channel=64, depth_strides=5)
+batch1 = batch_norm(input=conv1_, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
-pool1 = max_pooling_3d(input = act1, depth = 1, width = 2, height = 2)
+pool1 = max_pooling_3d(input=act1, depth=1, width=2, height=2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 
-conv2 = conv3d(input = drop1, name = 'conv2', depth = 3, kernel_size = 3, input_channel = 64, output_channel = 128, depth_strides = 1)
-batch2 = batch_norm(input = conv2, name = 'batch2', train = BN_train)
+conv2 = conv3d(input=drop1, name='conv2', depth=3, kernel_size=3, input_channel=64, output_channel=128)
+conv2_ = conv3d(input=conv2, name='conv2_', depth=3, kernel_size=3, input_channel=128, output_channel=128)
+batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
-pool2 = max_pooling_3d(input = act2, depth = 5, width = 1, height = 1)
+pool2 = max_pooling_3d(input=act1, depth=1, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
-lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4]) # to fit the time_major
+lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4])  # to fit the time_major
 
 print(lstm_input.get_shape())
 convlstm1 = convlstm_cell(input=lstm_input, name='convlstm1', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
@@ -268,7 +276,7 @@ convlstm2 = convlstm_cell(input=convlstm1, name='convlstm2', num_filters=128, ke
 convlstm3 = convlstm_cell(input=convlstm2, name='convlstm3', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
 convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, output_h=True)
 
-lstm_output = max_pooling_2d(batch_norm(convlstm4, name='lstm_output', train=BN_train), 2, 2)
+lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
 # convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
 # convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
 # convlstm3 = my_convlstm(input = convlstm2, name = 'convlstm3', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
@@ -277,12 +285,14 @@ lstm_output = max_pooling_2d(batch_norm(convlstm4, name='lstm_output', train=BN_
 
 print(lstm_output.get_shape())
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
-fc1 = fc(reshape, name = 'fc1', input_channel = 4 * 5 * 256, output_channel = 256)
-fc_batch1 = batch_norm(input = fc1, name = 'fc_batch1', train = BN_train)
+fc1 = fc(reshape, name='fc1', input_channel=4 * 5 * 256, output_channel=256)
+fc_batch1 = batch_norm(input=fc1, name='fc_batch1', train=BN_train)
 fc_act1 = tf.nn.relu(fc_batch1)
 fc_drop1 = tf.nn.dropout(fc_act1, keep_prob)
 
-y_predict = tf.nn.softmax(fc(fc_drop1, name = 'fc2', input_channel = 256, output_channel = 51))
+fc2 = fc(fc_drop1, name='fc2', input_channel=256, output_channel=51)
+fc_batch2 = batch_norm(input=fc2, name='fc_batch2', train=BN_train)
+y_predict = tf.nn.softmax(fc_batch2)
 
 cross_entropy = -tf.reduce_sum(y * tf.log(tf.clip_by_value(y_predict, 1e-10, 1.0)))
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
