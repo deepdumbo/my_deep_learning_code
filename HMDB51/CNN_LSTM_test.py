@@ -167,7 +167,8 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, seque
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(shape[1], dtype=tf.float32)
 
-    output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, sequence_length=sequence_length, time_major=True)
+    # output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, sequence_length=sequence_length, time_major=True)
+    output, state = tf.nn.dynamic_rnn(cell, inputs=input, initial_state=init_state, time_major=True)
     # output.get_shape = [time, batch, height, width, channel]
     # state is a tuple
     if output_h:
@@ -235,7 +236,7 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
 
 
 epoch_num = 200
-batch_size = 24
+batch_size = 32
 
 depth = 60
 height = 32
@@ -255,7 +256,7 @@ learning_rate = tf.placeholder('float', shape = [])
 """
 
 conv1 = conv3d(input=x, name='conv1', depth=3, kernel_size=3, input_channel=3, output_channel=64)
-conv1_ = conv3d(input=conv1, name='conv1_', depth=3, kernel_size=3, input_channel=3, output_channel=64, depth_strides=5)
+conv1_ = conv3d(input=conv1, name='conv1_', depth=3, kernel_size=3, input_channel=64, output_channel=64, depth_strides=5)
 batch1 = batch_norm(input=conv1_, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input=act1, depth=1, width=2, height=2)
@@ -265,23 +266,25 @@ conv2 = conv3d(input=drop1, name='conv2', depth=3, kernel_size=3, input_channel=
 conv2_ = conv3d(input=conv2, name='conv2_', depth=3, kernel_size=3, input_channel=128, output_channel=128)
 batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
-pool2 = max_pooling_3d(input=act1, depth=1, width=2, height=2)
+pool2 = max_pooling_3d(input=act2, depth=1, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4])  # to fit the time_major
 
 print(lstm_input.get_shape())
 convlstm1 = convlstm_cell(input=lstm_input, name='convlstm1', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-convlstm2 = convlstm_cell(input=convlstm1, name='convlstm2', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, pool=True)
+convlstm2 = convlstm_cell(input=convlstm1 + lstm_input, name='convlstm2', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, pool=True)
 convlstm3 = convlstm_cell(input=convlstm2, name='convlstm3', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, output_h=True)
+convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
 
-lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
+lstm_output = convlstm4 + convlstm3
+lstm_output = lstm_output[-1, :, :, :, :]
+
+# lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
 # convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
 # convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
 # convlstm3 = my_convlstm(input = convlstm2, name = 'convlstm3', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
 # convlstm4 = my_convlstm(input = convlstm3, name = 'convlstm4', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
-# lstm_output = convlstm4[-1, :, :, :, :]
 
 print(lstm_output.get_shape())
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
@@ -344,7 +347,9 @@ for epoch in range(epoch_num):
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
 
-    if test_correct / test_num > 0.30:
+    if test_correct / test_num > 0.42:
+        lr = 3e-5
+    elif test_correct / test_num > 0.30:
         lr = 1e-4
     else:
-        lr = 1e-3
+        lr = 4e-4
