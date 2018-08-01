@@ -208,11 +208,14 @@ class my_BasicConvLSTMCell(object):
         # new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
-        new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
+        bn_c = batch_norm(input=new_c, name=self.name+'c'+str(time_step), train=train)
+        bn_h = batch_norm(input=new_h, name=self.name+'h'+str(time_step), train=train)
+        new_state = (bn_c, bn_h)
+        # new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
         return new_h, new_state
 
 
-def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False):
+def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False, resdual = False):
     shape = input.get_shape().as_list()
     cell = my_BasicConvLSTMCell(name=name, kernel_size=kernel_size, input_channel=shape[-1], output_channel=output_channel)
 
@@ -223,8 +226,8 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = []
     input = tf.unstack(input, axis=0)
     for i in range(len(input)):
-        output_, state = cell(input=input[i], state=state, train=train, keep_prob=keep_prob, time_step=i)
-        output.append(output_)
+        output_h, state = cell(input=input[i], state=state, train=train, keep_prob=keep_prob, time_step=i)
+        output.append(output_h)
     output = tf.stack(output, axis=0)
 
     output = batch_norm(output, name=name, train=train)
@@ -282,10 +285,10 @@ print(lstm_input.get_shape())
 # lstm_output = convlstm4 + convlstm3
 
 # lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
-convlstm1 = my_convlstm(input = lstm_input, name = 'convlstm1', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
-convlstm2 = my_convlstm(input = convlstm1, name = 'convlstm2', output_channel = 128, kernel_size = 3, keep_prob = keep_prob, train = BN_train, pool = True)
-convlstm3 = my_convlstm(input = convlstm2, name = 'convlstm3', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
-convlstm4 = my_convlstm(input = convlstm3, name = 'convlstm4', output_channel = 256, kernel_size = 3, keep_prob = keep_prob, train = BN_train)
+convlstm1 = my_convlstm(input=lstm_input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+convlstm2 = my_convlstm(input=convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
+convlstm3 = my_convlstm(input=convlstm2, name='convlstm3', output_channel=256, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+convlstm4 = my_convlstm(input=convlstm3, name='convlstm4', output_channel=256, kernel_size=3, keep_prob=keep_prob, train=BN_train)
 lstm_output = convlstm4[-1, :, :, :, :]
 
 print(lstm_output.get_shape())
