@@ -89,9 +89,12 @@ def fc(input, name, input_channel, output_channel):
     b = tf.get_variable(name=name + '_bias', shape=[output_channel])
     return tf.matmul(input, W) + b
 
-def batch_norm(input, name, train, decay = 0.9):
+def batch_norm(input, name, train, decay = 0.9, rnn=False):
     shape = input.get_shape()
-    gamma = tf.get_variable(name = name + "_gamma", shape = [shape[-1]], initializer=tf.random_normal_initializer(1.0, 0.01))
+    if rnn:
+        gamma = tf.get_variable(name=name + "_gamma", shape=[shape[-1]], initializer=tf.random_normal_initializer(0.1, 0.001))
+    else:
+        gamma = tf.get_variable(name = name + "_gamma", shape = [shape[-1]], initializer=tf.random_normal_initializer(1.0, 0.01))
     beta = tf.get_variable(name = name + "_beta", shape = [shape[-1]], initializer=tf.constant_initializer(0.0))
 
     batch_mean, batch_variance = tf.nn.moments(input, list(range(len(shape) - 1)))
@@ -208,14 +211,14 @@ class my_BasicConvLSTMCell(object):
         # new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
-        bn_c = batch_norm(input=new_c, name=self.name+'c'+str(time_step), train=train)
-        bn_h = batch_norm(input=new_h, name=self.name+'h'+str(time_step), train=train)
-        new_state = (bn_c, bn_h)
+        bn_c = batch_norm(input=new_c, name=self.name+'c'+str(time_step), train=train, rnn=True)
+        bn_h = batch_norm(input=new_h, name=self.name+'h'+str(time_step), train=train, rnn=True)
+        new_state = (tf.nn.dropout(bn_c, keep_prob), tf.nn.dropout(bn_h, keep_prob))
         # new_state = (tf.nn.dropout(new_c, keep_prob), tf.nn.dropout(new_h, keep_prob))
         return new_h, new_state
 
 
-def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False, resdual = False):
+def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False, resdual = True):
     shape = input.get_shape().as_list()
     cell = my_BasicConvLSTMCell(name=name, kernel_size=kernel_size, input_channel=shape[-1], output_channel=output_channel)
 
@@ -231,17 +234,23 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = tf.stack(output, axis=0)
 
     output = batch_norm(output, name=name, train=train)
+
+    if resdual:
+        if shape[-1] == output_channel:
+            output = input + output
+        else:
+            print('Error: Failed for resnet! Input and output channel do not match!')
     output = tf.nn.relu(output)
     if pool:
         output = max_pooling_3d(input=output, depth=1, height=2, width=2)
-
+    output = tf.nn.dropout(output, keep_prob)
     return output
 
 
 
 
 epoch_num = 200
-batch_size = 48
+batch_size = 32
 
 depth = 60
 height = 32
@@ -287,13 +296,17 @@ print(lstm_input.get_shape())
 # lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
 convlstm1 = my_convlstm(input=lstm_input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
 convlstm2 = my_convlstm(input=convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
-convlstm3 = my_convlstm(input=convlstm2, name='convlstm3', output_channel=256, kernel_size=3, keep_prob=keep_prob, train=BN_train)
-convlstm4 = my_convlstm(input=convlstm3, name='convlstm4', output_channel=256, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+# convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
+
+convlstm3 = my_convlstm(input=convlstm2, name='convlstm3', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+convlstm4 = my_convlstm(input=convlstm3, name='convlstm4', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+# convlstm4_ = convlstm4 + convlstm2_
+
 lstm_output = convlstm4[-1, :, :, :, :]
 
 print(lstm_output.get_shape())
-reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 256])
-fc1 = fc(reshape, name='fc1', input_channel=4 * 5 * 256, output_channel=256)
+reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 128])
+fc1 = fc(reshape, name='fc1', input_channel=4 * 5 * 128, output_channel=256)
 fc_batch1 = batch_norm(input=fc1, name='fc_batch1', train=BN_train)
 fc_act1 = tf.nn.relu(fc_batch1)
 fc_drop1 = tf.nn.dropout(fc_act1, keep_prob)
@@ -314,7 +327,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 sess = tf.Session()
 
-DATA = MyDataset('prestored', batch_size, 0.2)
+DATA = MyDataset('prestored_60*32*40', batch_size, 0.2)
 train_num = DATA.train_num
 test_num = DATA.test_num
 
@@ -328,13 +341,13 @@ f = open('CNN_LSTM_res.txt', 'a')
 for epoch in range(epoch_num):
     train_correct = 0
     for i in range(int(train_num / batch_size)):
-        #print(i)
+        # print(i)
         t = time.time()
         data, label, length = DATA.train_get_next()
         #print(time.time() - t)
         t = time.time()
         if len(data) == batch_size:
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.7, learning_rate: lr})
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.8, learning_rate: lr})
             #print(time.time() - t)
             train_correct += num
 
@@ -353,8 +366,8 @@ for epoch in range(epoch_num):
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
 
     if test_correct / test_num > 0.42:
-        lr = 3e-5
+        lr = 4e-5
     elif test_correct / test_num > 0.30:
         lr = 1e-4
     else:
-        lr = 4e-4
+        lr = 3e-4

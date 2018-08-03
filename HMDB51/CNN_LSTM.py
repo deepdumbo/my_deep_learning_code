@@ -56,7 +56,8 @@ def prestore(PATH, depth, height, width, channel = 3, one_hot = True):
             video_length = length_count
 
             # TODO it may need more readable name
-            np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
+            if video_length > 10:
+                np.save('prestored/' + video.replace('avi', 'npy'), np.array([data, label, video_length]))
 
 
 def dataset(PATH, batch_size, epoch_num, proportion):
@@ -251,9 +252,9 @@ def convlstm_cell(input, name, sequence_length, num_filters, kernel_size, train,
 epoch_num = 100
 batch_size = 16
 
-depth = 60
-height = 32
-width = 40
+depth = 50
+height = 64
+width = 80
 
 prestore('hmdb51_org', depth, height, width)
 
