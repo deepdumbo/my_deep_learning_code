@@ -247,7 +247,33 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = tf.nn.dropout(output, keep_prob)
     return output
 
+def my_multi_convlstm(input, length, keep_prob, BN_train, dynimic=False):
+    # convlstm1 = convlstm_cell(input=lstm_input, name='convlstm1', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
+    # convlstm2 = convlstm_cell(input=convlstm1, name='convlstm2', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, pool=True)
+    # convlstm3 = convlstm_cell(input=convlstm2, name='convlstm3', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
+    # convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
+    # lstm_output = convlstm4 + convlstm3
+    # lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
 
+    convlstm1 = my_convlstm(input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+    convlstm2 = my_convlstm(convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
+    convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
+
+    convlstm3 = my_convlstm(convlstm2_, name='convlstm3', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+    convlstm4 = my_convlstm(convlstm3, name='convlstm4', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+    convlstm4_ = convlstm4 + convlstm2_
+
+    if dynimic:
+        output = []
+        output_tmp = tf.transpose(convlstm4_, [1, 0, 2, 3, 4])
+        output_tmp = tf.unstack(output_tmp, axis=0)
+        for i in range(len(output_tmp)):
+            output.append(output_tmp[i][length[i]])
+        output = tf.stack(output, axis=0)
+    else:
+        output = convlstm4_[-1, :, :, :, :]
+
+    return output
 
 
 epoch_num = 200
@@ -285,27 +311,11 @@ pool2 = max_pooling_3d(input=act2, depth=1, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
 lstm_input = tf.transpose(drop2, [1, 0, 2, 3, 4])  # to fit the time_major
-
 print(lstm_input.get_shape())
-# convlstm1 = convlstm_cell(input=lstm_input, name='convlstm1', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-# convlstm2 = convlstm_cell(input=convlstm1, name='convlstm2', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, pool=True)
-# convlstm3 = convlstm_cell(input=convlstm2, name='convlstm3', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-# convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
 
-# lstm_output = convlstm4 + convlstm3
-
-# lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
-convlstm1 = my_convlstm(input=lstm_input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
-convlstm2 = my_convlstm(input=convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
-convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
-
-convlstm3 = my_convlstm(input=convlstm2_, name='convlstm3', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
-convlstm4 = my_convlstm(input=convlstm3, name='convlstm4', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
-convlstm4_ = convlstm4 + convlstm2_
-
-lstm_output = convlstm4_[-1, :, :, :, :]
-
+lstm_output = my_multi_convlstm(input=lstm_input, length=sequence_length, keep_prob=keep_prob, BN_train=BN_train, dynimic=True)
 print(lstm_output.get_shape())
+
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 128])
 fc1 = fc(reshape, name='fc1', input_channel=4 * 5 * 128, output_channel=256)
 fc_batch1 = batch_norm(input=fc1, name='fc_batch1', train=BN_train)
