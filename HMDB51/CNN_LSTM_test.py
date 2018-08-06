@@ -237,7 +237,8 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
 
     if resdual:
         if shape[-1] == output_channel:
-            output = input + output
+            # output = input + output
+            pass
         else:
             print('Error: Failed for resnet! Input and output channel do not match!')
     output = tf.nn.relu(output)
@@ -296,13 +297,13 @@ print(lstm_input.get_shape())
 # lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
 convlstm1 = my_convlstm(input=lstm_input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
 convlstm2 = my_convlstm(input=convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
-# convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
+convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
 
-convlstm3 = my_convlstm(input=convlstm2, name='convlstm3', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
+convlstm3 = my_convlstm(input=convlstm2_, name='convlstm3', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
 convlstm4 = my_convlstm(input=convlstm3, name='convlstm4', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
-# convlstm4_ = convlstm4 + convlstm2_
+convlstm4_ = convlstm4 + convlstm2_
 
-lstm_output = convlstm4[-1, :, :, :, :]
+lstm_output = convlstm4_[-1, :, :, :, :]
 
 print(lstm_output.get_shape())
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 128])
@@ -347,7 +348,7 @@ for epoch in range(epoch_num):
         #print(time.time() - t)
         t = time.time()
         if len(data) == batch_size:
-            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.8, learning_rate: lr})
+            num, _ = sess.run([correct_num, train_step], feed_dict={x: data, y: label, sequence_length: length, BN_train: True, keep_prob: 0.7, learning_rate: lr})
             #print(time.time() - t)
             train_correct += num
 
