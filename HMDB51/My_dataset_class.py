@@ -34,8 +34,6 @@ class MyDataset(object):
         seed = np.random.randint(10000)
         np.random.seed(seed)
         np.random.shuffle(self.train)
-        np.random.seed(seed)
-        np.random.shuffle(self.train)
 
     def train_get_next(self):
         if self.train_get_next_cnt + self.batch_size > self.train_num:
@@ -48,7 +46,6 @@ class MyDataset(object):
     def test_get_next(self):
         if self.test_get_next_cnt + self.batch_size > self.test_num:
             self.test_get_next_cnt = 0
-            self.shuffle()
         data, label, length = self.load_prestored_data(self.test[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size])
         self.test_get_next_cnt += self.batch_size
         return data, label, length

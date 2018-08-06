@@ -15,7 +15,7 @@ def max_pooling_2d(input, width, height):
     return tf.nn.max_pool(input, ksize=[1, width, height, 1], strides=[1, width, height, 1], padding='SAME')
 
 
-def conv3d(input, name, depth, kernel_size, output_channel, depth_strides = 1, padding = 'SAME'):
+def conv3d(input, name, depth, kernel_size, output_channel, depth_strides=1, padding='SAME'):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[depth, kernel_size, kernel_size, input_channel, output_channel],
                         initializer=tf.random_uniform_initializer(0.0, 1.0))
