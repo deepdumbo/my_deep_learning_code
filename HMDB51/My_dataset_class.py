@@ -65,4 +65,4 @@ class MyDataset(object):
             label.append(tmp[1])
             length.append(tmp[2])
 
-        return np.array(data), np.array(label), (np.array(length) / 5).astype('int')
+        return np.array(data), np.array(label), (np.array(length) / 5).astype('int') - 1

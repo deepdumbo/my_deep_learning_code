@@ -16,7 +16,7 @@ def max_pooling_2d(input, width, height):
 
 
 def conv3d(input, name, depth, kernel_size, output_channel, depth_strides = 1, padding = 'SAME'):
-    input_channel = input.get_shape.as_list()[-1]
+    input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[depth, kernel_size, kernel_size, input_channel, output_channel],
                         initializer=tf.random_uniform_initializer(0.0, 1.0))
     b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
@@ -24,7 +24,7 @@ def conv3d(input, name, depth, kernel_size, output_channel, depth_strides = 1, p
 
 
 def conv2d(input, name, kernel_size, output_channel):
-    input_channel = input.get_shape.as_list()[-1]
+    input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[kernel_size, kernel_size, input_channel, output_channel],
                         initializer=tf.random_uniform_initializer(0.0, 1.0))
     b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
@@ -32,7 +32,7 @@ def conv2d(input, name, kernel_size, output_channel):
 
 
 def fc(input, name, output_channel):
-    input_channel = input.get_shape.as_list()[-1]
+    input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel],
                         initializer=tf.random_uniform_initializer(0.0, 1.0))
     b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
@@ -141,17 +141,13 @@ class my_BasicConvLSTMCell(object):
         self.activation = activation
         self.forget_bias = forget_bias
 
-        self.W = tf.get_variable(name=name+'_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel + self.output_channel, self.output_channel * 4])
-        self.b = tf.get_variable(name=name+'_bias', shape=[self.output_channel * 4])
-
     def __call__(self, input, state, train, keep_prob, time_step):
         c, h = state
         concat = tf.concat([input, h], axis=3)
-        # with tf.variable_scope("convlstm_cell", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("convlstm_cell", reuse=tf.AUTO_REUSE):
+            conv = conv2d(concat, name=self.name, kernel_size=self.kernel_size, output_channel=self.output_channel*4)
         #     conv_x = conv2d(input, self.name + '_x_conv', self.kernel_size, self.input_channel, self.output_channel*4)
         #     conv_h = conv2d(h, self.name + '_h_conv', self.kernel_size, self.output_channel, self.output_channel*4)
-
-        conv = tf.add(tf.nn.conv2d(concat, self.W, strides=[1, 1, 1, 1], padding='SAME'), self.b)
 
         i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
 
