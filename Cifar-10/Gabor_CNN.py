@@ -5,70 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as plimg
 import matplotlib.cm as cm
 #from PIL import Image
-
 import tensorflow as tf
-import cv2
-
-import os
-
-
-cnt = 1
-
-
-class batch_norm(object):
-    def __init__(self, decay=0.9):
-        self.epsilon = 1e-5
-        # use numbers closer to 1 if you have more data
-        self.decay = decay
-
-        self.ema = tf.train.ExponentialMovingAverage(decay=self.decay)
-
-    def __call__(self, x, train=True):
-        shape = x.get_shape().as_list()
-
-        # for placeholder case. if train is a tensor with a bool type, we
-        # cannot use 'if train' or 'if train is True'
-
-        with tf.variable_scope('batch_norm') as scope:
-            def batch_norm_training():
-                self.beta = tf.get_variable("beta", [shape[-1]],
-                                            initializer=tf.constant_initializer(0.))
-                self.gamma = tf.get_variable("gamma", [shape[-1]],
-                                             initializer=tf.random_normal_initializer(1., 0.02))
-
-                if len(shape) > 2:
-                    # conv layer
-                    batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name='moments')
-
-                else:
-                    # dense layer
-                    batch_mean, batch_var = tf.nn.moments(x, [0], name='moments')
-
-                # TODO: ema_apply name is quite long, try to fix it
-                ema_apply_op = self.ema.apply([batch_mean, batch_var])
-                self.ema_mean, self.ema_var = self.ema.average(batch_mean), self.ema.average(batch_var)
-
-                # compute the ema first
-                with tf.control_dependencies([ema_apply_op]):
-                    mean, var = tf.identity(batch_mean), tf.identity(batch_var)
-                return mean, var
-
-            def batch_norm_inference():
-                mean, var = self.ema_mean, self.ema_var
-                return mean, var
-
-            if isinstance(train, tf.Tensor):
-                mean, var = tf.cond(tf.equal(train, tf.constant(True)), batch_norm_training, batch_norm_inference)
-            else:
-                print 'failed'
-
-            normed = tf.nn.batch_normalization(
-                x, mean, var, self.beta, self.gamma, self.epsilon, name='compute')
-
-            return normed
-
-
-
 
 def load_CIFAR_batch(filename):
     """ load single batch of cifar """
@@ -83,9 +20,6 @@ def load_CIFAR_batch(filename):
 def load_CIFAR(Foldername):
     train_data = np.zeros([50000,32,32,3])
     train_label = np.zeros([50000,10])
-
-
-    
     for sample in range(5):
         X,Y = load_CIFAR_batch(Foldername+"/data_batch_"+str(sample+1))
 

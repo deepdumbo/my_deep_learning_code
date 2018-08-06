@@ -6,90 +6,40 @@ import time
 from My_dataset_class import MyDataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-def dataset(PATH, batch_size, epoch_num):
-    """
-    Generate the tf.data.dataset. This function return the iterator and sample size. iterator need to be initial as
-        sess.run(iterator.initializer)
-    And you can get batch data as 
-        sess.run(iterator.get_next())
-    Args:
-        PATH: 
-        batch_size: 
-        epoch_num:
-        one_hot:
-
-    Returns: [train_iterator, train_num, test_iterator, test_num]
-
-    """
-    train_data = []
-    train_label = []
-    test_data = []
-    test_label = []
-
-    train_data_list = os.listdir(PATH + '/numpy/train')
-    train_num = len(train_data_list)
-
-    for i in range(train_num):
-        train_data.append(PATH + '/numpy/train/' + train_data_list[i] + '/data.npy')
-        train_label.append(np.load(PATH + '/numpy/train/' + train_data_list[i] + '/label.npy'))
-
-    test_data_list = os.listdir(PATH + '/numpy/test')
-    test_num = len(test_data_list)
-
-    for i in range(test_num):
-        test_data.append(PATH + '/numpy/test/' + test_data_list[i] + '/data.npy')
-        test_label.append(np.load(PATH + '/numpy/test/' + test_data_list[i] + '/label.npy'))
-
-    print(train_num, test_num)
-    test_dataset = tf.data.Dataset.from_tensor_slices((test_data, np.array(test_label)))
-    test_dataset = test_dataset.shuffle(buffer_size=test_num*10).batch(batch_size).repeat(epoch_num)
-    test_iterator = test_dataset.make_initializable_iterator()
-    train_dataset = tf.data.Dataset.from_tensor_slices((train_data, np.array(train_label)))
-    train_dataset = train_dataset.shuffle(buffer_size=train_num*10).batch(batch_size).repeat(epoch_num)
-    train_iterator = train_dataset.make_initializable_iterator()
-
-
-    return train_iterator, train_num, test_iterator, test_num
-
-def load_prestored_data(PATH, depth, height, width, channel = 3):
-    batch_size = len(PATH)
-    data = []
-
-    for i in range(batch_size):
-        data.append(np.load(PATH[i].decode()))
-
-    return np.array(data)
 
 def max_pooling_3d(input, depth, width, height):
     return tf.nn.max_pool3d(input, ksize=[1, depth, width, height, 1], strides=[1, depth, width, height, 1], padding='SAME')
 
+
 def max_pooling_2d(input, width, height):
     return tf.nn.max_pool(input, ksize=[1, width, height, 1], strides=[1, width, height, 1], padding='SAME')
 
-def conv3d(input, name, depth, kernel_size, input_channel, output_channel, depth_strides = 1, padding = 'SAME'):
-    W = tf.get_variable(name = name + '_Weight', shape = [depth, kernel_size, kernel_size, input_channel, output_channel])
-    b = tf.get_variable(name = name + '_bias', shape = [output_channel])
+
+def conv3d(input, name, depth, kernel_size, output_channel, depth_strides = 1, padding = 'SAME'):
+    input_channel = input.get_shape.as_list()[-1]
+    W = tf.get_variable(name=name + '_Weight', shape=[depth, kernel_size, kernel_size, input_channel, output_channel],
+                        initializer=tf.random_uniform_initializer(0.0, 1.0))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
     return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding=padding), b)
 
-def conv2d(input, name, kernel_size, input_channel, output_channel):
-    W = tf.get_variable(name = name + '_Weight', shape = [kernel_size, kernel_size, input_channel, output_channel])
-    b = tf.get_variable(name = name + '_bias', shape = [output_channel])
+
+def conv2d(input, name, kernel_size, output_channel):
+    input_channel = input.get_shape.as_list()[-1]
+    W = tf.get_variable(name=name + '_Weight', shape=[kernel_size, kernel_size, input_channel, output_channel],
+                        initializer=tf.random_uniform_initializer(0.0, 1.0))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
     return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME'), b)
 
-def conv2d_to_1_mul_1(input, name, input_channel, output_channel):
-    shape = input.get_shape()
-    height = shape[1]
-    width = shape[2]
-    W = tf.get_variable(name = name + '_Weight', shape = [height, width, input_channel, output_channel])
-    b = tf.get_variable(name = name + '_bias', shape = [output_channel])
-    return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='VALID'), b)
 
-def fc(input, name, input_channel, output_channel):
-    W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel])
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel])
+def fc(input, name, output_channel):
+    input_channel = input.get_shape.as_list()[-1]
+    W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel],
+                        initializer=tf.random_uniform_initializer(0.0, 1.0))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
     return tf.matmul(input, W) + b
 
-def batch_norm(input, name, train, decay = 0.9, rnn=False):
+
+def batch_norm(input, name, train, decay=0.9, rnn=False):
     shape = input.get_shape()
     if rnn:
         gamma = tf.get_variable(name=name + "_gamma", shape=[shape[-1]], initializer=tf.random_normal_initializer(0.1, 0.001))
@@ -143,21 +93,18 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
     def output_size(self):
         return self._size
 
-    def __call__(self, inputs, state, scope=None):
+    def __call__(self, input, state, scope=None):
         # we suppose inputs to be [time, batch_size, row, col, channel]
         with tf.variable_scope(scope or "basic_convlstm_cell"):
             c, h = state
-
-            inp_channel = inputs.get_shape().as_list()[-1]+self._num_filters
             out_channel = self._num_filters * 4
-            concat = tf.concat([inputs, h], axis=3)
+            concat = tf.concat([input, h], axis=3)
 
-            concat = conv2d(input = concat, name = self._name, kernel_size = self._kernel_size[0], input_channel = inp_channel, output_channel = out_channel)
+            concat = conv2d(input=concat, name=self._name, kernel_size=self._kernel_size[0], output_channel=out_channel)
 
             i, j, f, o = tf.split(value=concat, num_or_size_splits=4, axis=3)
 
             new_c = (c * tf.sigmoid(f + self._forget_bias) + tf.sigmoid(i) * self._activation(j))
-            # new_c = batch_norm(new_c, name=self.name + '_c', train=self.train)
             new_h = self._activation(new_c) * tf.sigmoid(o)
 
             new_state = tf.contrib.rnn.LSTMStateTuple(new_c, new_h)
@@ -165,7 +112,7 @@ class BasicConvLSTMCell(tf.contrib.rnn.RNNCell):
 
 
 def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, sequence_length, pool = False, output_h = False):
-    shape = input.get_shape().as_list() #[time, batch, height, width, channel]
+    shape = input.get_shape().as_list()  # [time, batch, height, width, channel]
     cell = BasicConvLSTMCell(shape = [shape[2], shape[3]], num_filters = num_filters, kernel_size = kernel_size, name = name, train=train)
     cell = tf.contrib.rnn.DropoutWrapper(cell = cell, input_keep_prob = 1.0, output_keep_prob = keep_prob)
     init_state = cell.zero_state(shape[1], dtype=tf.float32)
@@ -184,6 +131,7 @@ def convlstm_cell(input, name, num_filters, kernel_size, keep_prob, train, seque
 
     return output
 
+
 class my_BasicConvLSTMCell(object):
     def __init__(self, name, kernel_size, input_channel, output_channel, activation=tf.nn.softsign, forget_bias=1.0):
         self.name = name
@@ -193,8 +141,8 @@ class my_BasicConvLSTMCell(object):
         self.activation = activation
         self.forget_bias = forget_bias
 
-        self.W = tf.get_variable(name=name + '_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel + self.output_channel, self.output_channel * 4])
-        self.b = tf.get_variable(name=name + '_bias', shape=[self.output_channel * 4])
+        self.W = tf.get_variable(name=name+'_Weight', shape=[self.kernel_size, self.kernel_size, self.input_channel + self.output_channel, self.output_channel * 4])
+        self.b = tf.get_variable(name=name+'_bias', shape=[self.output_channel * 4])
 
     def __call__(self, input, state, train, keep_prob, time_step):
         c, h = state
@@ -208,7 +156,6 @@ class my_BasicConvLSTMCell(object):
         i, j, f, o = tf.split(value=conv, num_or_size_splits=4, axis=3)
 
         new_c = (c * tf.sigmoid(f + self.forget_bias) + tf.sigmoid(i) * self.activation(j))
-        # new_c = batch_norm(new_c, name=self.name + '_step' + str(time_step), train=train)
         new_h = self.activation(new_c) * tf.sigmoid(o)
 
         bn_c = batch_norm(input=new_c, name=self.name+'c'+str(time_step), train=train, rnn=True)
@@ -218,7 +165,7 @@ class my_BasicConvLSTMCell(object):
         return new_h, new_state
 
 
-def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False, resdual = True):
+def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool=False):
     shape = input.get_shape().as_list()
     cell = my_BasicConvLSTMCell(name=name, kernel_size=kernel_size, input_channel=shape[-1], output_channel=output_channel)
 
@@ -234,27 +181,14 @@ def my_convlstm(input, name, output_channel, kernel_size, keep_prob, train, pool
     output = tf.stack(output, axis=0)
 
     output = batch_norm(output, name=name, train=train)
-
-    if resdual:
-        if shape[-1] == output_channel:
-            # output = input + output
-            pass
-        else:
-            print('Error: Failed for resnet! Input and output channel do not match!')
     output = tf.nn.relu(output)
     if pool:
         output = max_pooling_3d(input=output, depth=1, height=2, width=2)
     output = tf.nn.dropout(output, keep_prob)
+
     return output
 
 def my_multi_convlstm(input, length, keep_prob, BN_train, dynimic=False):
-    # convlstm1 = convlstm_cell(input=lstm_input, name='convlstm1', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-    # convlstm2 = convlstm_cell(input=convlstm1, name='convlstm2', num_filters=128, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length, pool=True)
-    # convlstm3 = convlstm_cell(input=convlstm2, name='convlstm3', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-    # convlstm4 = convlstm_cell(input=convlstm3, name='convlstm4', num_filters=256, kernel_size=[3, 3], keep_prob=keep_prob, train=BN_train, sequence_length=sequence_length)
-    # lstm_output = convlstm4 + convlstm3
-    # lstm_output = batch_norm(convlstm4, name='lstm_output', train=BN_train)
-
     convlstm1 = my_convlstm(input, name='convlstm1', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train)
     convlstm2 = my_convlstm(convlstm1, name='convlstm2', output_channel=128, kernel_size=3, keep_prob=keep_prob, train=BN_train, pool=True)
     convlstm2_ = convlstm2 + max_pooling_3d(lstm_input, 1, 2, 2)
@@ -296,15 +230,15 @@ learning_rate = tf.placeholder('float', shape = [])
 11111111111
 """
 
-conv1 = conv3d(input=x, name='conv1', depth=3, kernel_size=3, input_channel=3, output_channel=64)
-conv1_ = conv3d(input=conv1, name='conv1_', depth=3, kernel_size=3, input_channel=64, output_channel=64, depth_strides=5)
+conv1 = conv3d(input=x, name='conv1', depth=3, kernel_size=3, output_channel=64)
+conv1_ = conv3d(input=conv1, name='conv1_', depth=3, kernel_size=3, output_channel=64, depth_strides=5)
 batch1 = batch_norm(input=conv1_, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_3d(input=act1, depth=1, width=2, height=2)
 drop1 = tf.nn.dropout(pool1, keep_prob)
 
-conv2 = conv3d(input=drop1, name='conv2', depth=3, kernel_size=3, input_channel=64, output_channel=128)
-conv2_ = conv3d(input=conv2, name='conv2_', depth=3, kernel_size=3, input_channel=128, output_channel=128)
+conv2 = conv3d(input=drop1, name='conv2', depth=3, kernel_size=3, output_channel=128)
+conv2_ = conv3d(input=conv2, name='conv2_', depth=3, kernel_size=3, output_channel=128)
 batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_3d(input=act2, depth=1, width=2, height=2)
@@ -317,12 +251,12 @@ lstm_output = my_multi_convlstm(input=lstm_input, length=sequence_length, keep_p
 print(lstm_output.get_shape())
 
 reshape = tf.reshape(lstm_output, [batch_size, 4 * 5 * 128])
-fc1 = fc(reshape, name='fc1', input_channel=4 * 5 * 128, output_channel=256)
+fc1 = fc(reshape, name='fc1', output_channel=256)
 fc_batch1 = batch_norm(input=fc1, name='fc_batch1', train=BN_train)
 fc_act1 = tf.nn.relu(fc_batch1)
 fc_drop1 = tf.nn.dropout(fc_act1, keep_prob)
 
-fc2 = fc(fc_drop1, name='fc2', input_channel=256, output_channel=51)
+fc2 = fc(fc_drop1, name='fc2', output_channel=51)
 fc_batch2 = batch_norm(input=fc2, name='fc_batch2', train=BN_train)
 y_predict = tf.nn.softmax(fc_batch2)
 
