@@ -106,7 +106,7 @@ def Expand_dim_up(input, num):
     return res
 
 
-def Gabor_filter(input, name, theta_num, lambda_num, size):
+def Gabor_filter(input, name, theta_num, lambda_num, size, output_channel):
     """
     Theta and Lambda is very important in Gabor filter.
     Theta: [-pi, pi]
@@ -125,17 +125,25 @@ def Gabor_filter(input, name, theta_num, lambda_num, size):
     """
     shape = input.get_shape().as_list() # [batch, height, width, input_channel]
     input_channel = shape[3]
-    output_channel = theta_num*lambda_num
+    # output_channel = theta_num * lambda_num
 
     pi = tf.asin(1.0) * 2.0
-    Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
-                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
-    Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
-                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=shape[1]))
-    Theta, Lambda = tf.meshgrid(Theta, Lambda)
-    Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
-    Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
+    # Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
+    #                         initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
+    # Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
+    #                          initializer=tf.random_uniform_initializer(minval=2.0, maxval=shape[1]))
+    # Theta, Lambda = tf.meshgrid(Theta, Lambda)
+    # Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
+    # Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
     # print(Theta.get_shape())
+
+    Theta = tf.get_variable(name=name+"_theta", shape=[1, 1, input_channel, output_channel],
+                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
+    Lambda = tf.get_variable(name=name+"_lambda", shape=[1, 1, input_channel, output_channel],
+                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=shape[1]))
+    Theta = tf.tile(input=Theta, multiples=[size, size, 1, 1])
+    Lambda = tf.tile(input=Lambda, multiples=[size, size, 1, 1])
+    print(Theta.get_shape())
 
     coordinate_start = -(size - 1) / 2.0
     coordinate_stop = -coordinate_start
@@ -160,7 +168,7 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float")
 BN_train = tf.placeholder("bool", shape=[])
 
-conv1 = Gabor_filter(x, 'Gabor', 6, 6, 11)
+conv1 = Gabor_filter(x, 'Gabor', 6, 6, 11, 64)
 # conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
 batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
