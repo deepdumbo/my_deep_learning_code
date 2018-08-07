@@ -18,24 +18,24 @@ def max_pooling_2d(input, width, height):
 def conv3d(input, name, depth, kernel_size, output_channel, depth_strides=1, padding='SAME'):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[depth, kernel_size, kernel_size, input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding=padding), b)
 
 
 def conv2d(input, name, kernel_size, output_channel):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[kernel_size, kernel_size, input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME'), b)
 
 
 def fc(input, name, output_channel):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.matmul(input, W) + b
 
 
@@ -149,9 +149,9 @@ def Gabor_filter(input, name, theta_num, lambda_num, size):
 
     x_ = tf.add(tf.multiply(x, tf.cos(Theta)), tf.multiply(y, tf.sin(Theta)))
     y_ = tf.add(-tf.multiply(x, tf.sin(Theta)), tf.multiply(y, tf.cos(Theta)))
-    res = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
+    filter = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
                       tf.cos(2.0 * pi * x_ / Lambda))
-    return res
+    return tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
 
 
 batch_size = 50
@@ -160,8 +160,8 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float")
 BN_train = tf.placeholder("bool", shape=[])
 
-Gabor_filter(x, 'Gabor', 4, 4, 7)
-conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
+conv1 = Gabor_filter(x, 'Gabor', 6, 6, 11)
+# conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
 batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)

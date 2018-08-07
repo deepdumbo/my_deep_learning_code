@@ -18,24 +18,24 @@ def max_pooling_2d(input, width, height):
 def conv3d(input, name, depth, kernel_size, output_channel, depth_strides=1, padding='SAME'):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[depth, kernel_size, kernel_size, input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.add(tf.nn.conv3d(input, W, strides=[1, depth_strides, 1, 1, 1], padding=padding), b)
 
 
 def conv2d(input, name, kernel_size, output_channel):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[kernel_size, kernel_size, input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.add(tf.nn.conv2d(input, W, strides=[1, 1, 1, 1], padding='SAME'), b)
 
 
 def fc(input, name, output_channel):
     input_channel = input.get_shape().as_list()[-1]
     W = tf.get_variable(name=name + '_Weight', shape=[input_channel, output_channel],
-                        initializer=tf.random_uniform_initializer(0.0, 1.0))
-    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.zeros_initializer())
+                        initializer=tf.truncated_normal_initializer(0.0, 0.1))
+    b = tf.get_variable(name=name + '_bias', shape=[output_channel], initializer=tf.constant_initializer(0.1))
     return tf.matmul(input, W) + b
 
 

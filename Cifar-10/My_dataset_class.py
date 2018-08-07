@@ -36,6 +36,7 @@ class MyDataset(object):
 
         self.data[:, :, :, :] = self.train_data[self.train_get_next_cnt: self.train_get_next_cnt+self.batch_size, :, :, :]
         self.label[:, :] = self.train_label[self.train_get_next_cnt: self.train_get_next_cnt+self.batch_size, :]
+        self.train_get_next_cnt += self.batch_size
         return self.data, self.label
 
     def test_get_next(self):
@@ -43,6 +44,7 @@ class MyDataset(object):
             self.test_get_next_cnt = 0
         self.data[:, :, :, :] = self.test_data[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size, :, :, :]
         self.label[:, :] = self.test_label[self.test_get_next_cnt: self.test_get_next_cnt + self.batch_size, :]
+        self.test_get_next_cnt += self.batch_size
         return self.data, self.label
 
     def load_CIFAR_batch(self, filename):
