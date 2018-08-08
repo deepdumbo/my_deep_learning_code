@@ -106,7 +106,7 @@ def Expand_dim_up(input, num):
     return res
 
 
-def Gabor_filter(input, name, theta_num, lambda_num, size, output_channel):
+def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     """
     Theta and Lambda is very important in Gabor filter.
     Theta: [-pi, pi]
@@ -128,22 +128,22 @@ def Gabor_filter(input, name, theta_num, lambda_num, size, output_channel):
     output_channel = theta_num * lambda_num
 
     pi = tf.asin(1.0) * 2.0
-    Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
-                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
-    Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
-                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
-    Theta, Lambda = tf.meshgrid(Theta, Lambda)
-    Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
-    Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
-    print(Theta.get_shape())
-
-    # Theta = tf.get_variable(name=name+"_theta", shape=[1, 1, input_channel, output_channel],
+    # Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
     #                         initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
-    # Lambda = tf.get_variable(name=name+"_lambda", shape=[1, 1, input_channel, output_channel],
+    # Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
     #                          initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
-    # Theta = tf.tile(input=Theta, multiples=[size, size, 1, 1])
-    # Lambda = tf.tile(input=Lambda, multiples=[size, size, 1, 1])
+    # Theta, Lambda = tf.meshgrid(Theta, Lambda)
+    # Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
+    # Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
     # print(Theta.get_shape())
+
+    Theta = tf.get_variable(name=name+"_theta", shape=[1, 1, input_channel, output_channel],
+                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
+    Lambda = tf.get_variable(name=name+"_lambda", shape=[1, 1, input_channel, output_channel],
+                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
+    Theta = tf.tile(input=Theta, multiples=[size, size, 1, 1])
+    Lambda = tf.tile(input=Lambda, multiples=[size, size, 1, 1])
+    print(Theta.get_shape())
 
     coordinate_start = -(size - 1) / 2.0
     coordinate_stop = -coordinate_start
@@ -159,7 +159,8 @@ def Gabor_filter(input, name, theta_num, lambda_num, size, output_channel):
     y_ = tf.add(-tf.multiply(x, tf.sin(Theta)), tf.multiply(y, tf.cos(Theta)))
     filter = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
                       tf.cos(2.0 * pi * x_ / Lambda))
-    return tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
+    output = tf.abs(tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME'))
+    return output
 
 
 batch_size = 50
@@ -168,11 +169,11 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float")
 BN_train = tf.placeholder("bool", shape=[])
 
-conv1 = Gabor_filter(x, 'Gabor', 8, 8, 11, 64)
+conv1 = conv2d_Gabor(x, 'Gabor1', 8, 8, 7, 64)
 # conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
 batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
-act1 = tf.nn.relu(batch1)
-pool1 = max_pooling_2d(input=act1, width=2, height=2)
+# act1 = tf.nn.relu(batch1)
+pool1 = max_pooling_2d(input=batch1, width=2, height=2)
 #drop1 = tf.nn.dropout(pool1, keep_prob)
 
 conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=256)
@@ -220,6 +221,7 @@ for _ in variable_name:
 f = open('Gabor_CNN.txt', 'a')
 epoch_num = 100
 for epoch in range(epoch_num):
+    t = time.time()
     train_correct = 0
     for i in range(int(train_num / batch_size)):
         data, label = DATA.train_get_next()
@@ -240,3 +242,4 @@ for epoch in range(epoch_num):
             test_correct += num
     print('test accuracy: %f ' % (test_correct / test_num))
     f.write('test accuracy: %f ' % (test_correct / test_num) + '\n')
+    print(time.time() - t)
