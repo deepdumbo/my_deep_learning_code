@@ -174,7 +174,7 @@ conv1 = conv2d_Gabor(x, 'Gabor1', 8, 8, 7, 64)
 batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
 # act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=batch1, width=2, height=2)
-#drop1 = tf.nn.dropout(pool1, keep_prob)
+# drop1 = tf.nn.dropout(pool1, keep_prob)
 
 conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=256)
 batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
