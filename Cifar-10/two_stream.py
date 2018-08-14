@@ -42,9 +42,9 @@ def fc(input, name, output_channel):
 def batch_norm(input, name, train, decay=0.9, rnn=False):
     shape = input.get_shape()
     if rnn:
-        gamma = tf.get_variable(name=name + "_gamma", shape=[shape[-1]], initializer=tf.random_normal_initializer(0.1, 0.001))
+        gamma = tf.get_variable(name=name + "_gamma", shape=[shape[-1]], initializer=tf.truncated_normal_initializer(0.1, 0.01))
     else:
-        gamma = tf.get_variable(name = name + "_gamma", shape = [shape[-1]], initializer=tf.random_normal_initializer(1.0, 0.01))
+        gamma = tf.get_variable(name = name + "_gamma", shape = [shape[-1]], initializer=tf.truncated_normal_initializer(1.0, 0.1))
     beta = tf.get_variable(name = name + "_beta", shape = [shape[-1]], initializer=tf.constant_initializer(0.0))
 
     batch_mean, batch_variance = tf.nn.moments(input, list(range(len(shape) - 1)))
@@ -160,7 +160,7 @@ def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     filter = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
                       tf.cos(2.0 * pi * x_ / Lambda))
     output =tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
-    # output =  tf.abs(output)
+    output =  tf.abs(output)
     return output
 
 
@@ -170,25 +170,25 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float")
 BN_train = tf.placeholder("bool", shape=[])
 
-conv1 = conv2d_Gabor(x, 'Gabor1', 8, 8, 7, 64)
-# conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
-batch1 = batch_norm(input=conv1, name='batch1', train=BN_train)
-act1 = tf.nn.relu(batch1)
-pool1 = max_pooling_2d(input=act1, width=2, height=2)
+# conv1 = conv2d_Gabor(x, 'Gabor1', 8, 8, 13, 64)
+conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
+batch1 = batch_norm(input=tf.abs(conv1), name='batch1', train=BN_train)
+# act1 = tf.nn.relu(batch1)
+pool1 = max_pooling_2d(input=batch1, width=2, height=2)
 #drop1 = tf.nn.dropout(pool1, keep_prob)
 
 conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=256)
 # conv2 = conv2d_Gabor(pool1, 'Gabor2', 8, 8, 7, 64)
-batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
-act2 = tf.nn.relu(batch2)
-pool2 = max_pooling_2d(input=act2, width=2, height=2)
+batch2 = batch_norm(input=tf.abs(conv2), name='batch2', train=BN_train)
+# act2 = tf.nn.relu(batch2)
+pool2 = max_pooling_2d(input=batch2, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
 conv3 = conv2d(input=drop2, name='conv3', kernel_size=3, output_channel=256)
 # conv3 = conv2d_Gabor(drop2, 'Gabor3', 8, 8, 7, 64)
-batch3 = batch_norm(input=conv3, name='batch3', train=BN_train)
-act3 = tf.nn.relu(batch3)
-pool3 = max_pooling_2d(input=act3, width=2, height=2)
+batch3 = batch_norm(input=tf.abs(conv3), name='batch3', train=BN_train)
+# act3 = tf.nn.relu(batch3)
+pool3 = max_pooling_2d(input=batch3, width=2, height=2)
 drop3 = tf.nn.dropout(pool3, keep_prob)
 
 fc1 = fc(input=tf.reshape(drop3, [-1, 4 * 4 * 256]), name='fc1', output_channel=256)
