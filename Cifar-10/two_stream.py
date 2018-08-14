@@ -126,24 +126,24 @@ def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     shape = input.get_shape().as_list() # [batch, height, width, input_channel]
     input_channel = shape[3]
     output_channel = theta_num * lambda_num
-
     pi = tf.asin(1.0) * 2.0
-    Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
-                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
-    Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
-                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
-    Theta, Lambda = tf.meshgrid(Theta, Lambda)
-    Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
-    Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
-    print(Theta.get_shape())
 
-    # Theta = tf.get_variable(name=name+"_theta", shape=[1, 1, input_channel, output_channel],
+    # Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
     #                         initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
-    # Lambda = tf.get_variable(name=name+"_lambda", shape=[1, 1, input_channel, output_channel],
+    # Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
     #                          initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
-    # Theta = tf.tile(input=Theta, multiples=[size, size, 1, 1])
-    # Lambda = tf.tile(input=Lambda, multiples=[size, size, 1, 1])
+    # Theta, Lambda = tf.meshgrid(Theta, Lambda)
+    # Theta = tf.tile(input=Expand_dim_up(tf.reshape(Theta, [-1]), 3), multiples=[size, size, input_channel, 1])
+    # Lambda = tf.tile(input=Expand_dim_up(tf.reshape(Lambda, [-1]), 3), multiples=[size, size, input_channel, 1])
     # print(Theta.get_shape())
+
+    Theta = tf.get_variable(name=name+"_theta", shape=[1, 1, input_channel, output_channel],
+                            initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
+    Lambda = tf.get_variable(name=name+"_lambda", shape=[1, 1, input_channel, output_channel],
+                             initializer=tf.random_uniform_initializer(minval=2.0, maxval=min(shape[1], shape[2])/5))
+    Theta = tf.tile(input=Theta, multiples=[size, size, 1, 1])
+    Lambda = tf.tile(input=Lambda, multiples=[size, size, 1, 1])
+    print(Theta.get_shape())
 
     coordinate_start = -(size - 1) / 2.0
     coordinate_stop = -coordinate_start
@@ -159,7 +159,8 @@ def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     y_ = tf.add(-tf.multiply(x, tf.sin(Theta)), tf.multiply(y, tf.cos(Theta)))
     filter = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
                       tf.cos(2.0 * pi * x_ / Lambda))
-    output = tf.abs(tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME'))
+    output =tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
+    # output =  tf.abs(output)
     return output
 
 
@@ -176,21 +177,21 @@ act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)
 #drop1 = tf.nn.dropout(pool1, keep_prob)
 
-# conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=64)
-conv2 = conv2d_Gabor(pool1, 'Gabor2', 8, 8, 7, 64)
+conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=256)
+# conv2 = conv2d_Gabor(pool1, 'Gabor2', 8, 8, 7, 64)
 batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_2d(input=act2, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
 
-# conv3 = conv2d(input=drop2, name='conv3', kernel_size=3, output_channel=64)
-conv3 = conv2d_Gabor(drop2, 'Gabor3', 8, 8, 7, 64)
+conv3 = conv2d(input=drop2, name='conv3', kernel_size=3, output_channel=256)
+# conv3 = conv2d_Gabor(drop2, 'Gabor3', 8, 8, 7, 64)
 batch3 = batch_norm(input=conv3, name='batch3', train=BN_train)
 act3 = tf.nn.relu(batch3)
 pool3 = max_pooling_2d(input=act3, width=2, height=2)
 drop3 = tf.nn.dropout(pool3, keep_prob)
 
-fc1 = fc(input=tf.reshape(drop3, [-1, 4 * 4 * 64]), name='fc1', output_channel=256)
+fc1 = fc(input=tf.reshape(drop3, [-1, 4 * 4 * 256]), name='fc1', output_channel=256)
 fc1_batch = batch_norm(input=fc1, name='fc_batch1', train=BN_train)
 fc1_act = tf.nn.relu(fc1_batch)
 drop4 = tf.nn.dropout(fc1_act, keep_prob)
