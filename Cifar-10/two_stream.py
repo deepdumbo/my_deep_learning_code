@@ -123,11 +123,11 @@ def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     Returns:
 
     """
+    pi = tf.asin(1.0) * 2.0
     shape = input.get_shape().as_list() # [batch, height, width, input_channel]
     input_channel = shape[3]
-    output_channel = theta_num * lambda_num
-    pi = tf.asin(1.0) * 2.0
 
+    # output_channel = theta_num * lambda_num
     # Theta = tf.get_variable(name=name+"_theta", shape=[theta_num],
     #                         initializer=tf.random_uniform_initializer(minval=-pi, maxval=pi))
     # Lambda = tf.get_variable(name=name+"_lambda", shape=[lambda_num],
@@ -159,8 +159,8 @@ def conv2d_Gabor(input, name, theta_num, lambda_num, size, output_channel):
     y_ = tf.add(-tf.multiply(x, tf.sin(Theta)), tf.multiply(y, tf.cos(Theta)))
     filter = tf.multiply(tf.exp(-tf.div(tf.add(tf.square(x_), tf.square(y_)), tf.multiply(2.0, tf.square(Sigma)))),
                       tf.cos(2.0 * pi * x_ / Lambda))
-    output =tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
-    output =  tf.abs(output)
+    output = tf.nn.conv2d(input, filter, strides=[1, 1, 1, 1], padding='SAME')
+    output = tf.abs(output)
     return output
 
 
@@ -170,19 +170,22 @@ y = tf.placeholder("float", shape=[batch_size, 10])
 keep_prob = tf.placeholder("float")
 BN_train = tf.placeholder("bool", shape=[])
 
-conv_Gabor = conv2d_Gabor(x, 'Gabor1', 8, 8, 13, 64)
+conv_Gabor1 = conv2d_Gabor(x, 'Gabor1', 8, 8, 13, 64)
 conv1 = conv2d(input=x, name='conv1', kernel_size=3,output_channel=64)
-concat = tf.concat([conv_Gabor, conv1], axis=0)
-print(concat.get_shape())
+concat1 = tf.concat([conv_Gabor1, conv1], axis=-1)
+print(concat1.get_shape())
 
-batch1 = batch_norm(input=concat, name='batch1', train=BN_train)
+batch1 = batch_norm(input=concat1, name='batch1', train=BN_train)
 act1 = tf.nn.relu(batch1)
 pool1 = max_pooling_2d(input=act1, width=2, height=2)
 #drop1 = tf.nn.dropout(pool1, keep_prob)
 
-conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=256)
-# conv2 = conv2d_Gabor(pool1, 'Gabor2', 8, 8, 7, 64)
-batch2 = batch_norm(input=conv2, name='batch2', train=BN_train)
+conv_Gabor2 = conv2d_Gabor(x, 'Gabor2', 12, 12, 7, 128)
+conv2 = conv2d(input=pool1, name='conv2', kernel_size=3, output_channel=128)
+concat2 = tf.concat([conv_Gabor2, conv2], axis=-1)
+print(concat2.get_shape())
+
+batch2 = batch_norm(input=concat2, name='batch2', train=BN_train)
 act2 = tf.nn.relu(batch2)
 pool2 = max_pooling_2d(input=act2, width=2, height=2)
 drop2 = tf.nn.dropout(pool2, keep_prob)
